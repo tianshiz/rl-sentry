@@ -1,0 +1,20 @@
+<package>
+  <description brief="ros_sentry">
+
+     ros_sentry
+
+  </description>
+  <author>Alessandro Farsi</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/ros_sentry</url>
+  <depend package="rospy"/>
+  <depend package="roscpp"/>
+  <depend package="geometry_msgs"/>
+  <depend package="kinematics_msgs"/>
+  <depend package="openni_camera"/>
+  <depend package="openni_tracker"/>
+
+</package>
+
+
