@@ -15,40 +15,45 @@ import actionlib
 def callback(data):
     rospy.loginfo(rospy.get_name() + ": I heard %s" % data.data)
 
-def create_goal(joints_p):
+def create_goal(joints_p, arm_side = 'r'):
     """ Create a goal for a given set of joints angles """
     goal = JointTrajectoryGoal()
     # Populates trajectory with joint names.
-    goal.trajectory.joint_names.append("r_shoulder_pan_joint")
-    goal.trajectory.joint_names.append("r_shoulder_lift_joint")
-    goal.trajectory.joint_names.append("r_upper_arm_roll_joint")
-    goal.trajectory.joint_names.append("r_elbow_flex_joint")
-    goal.trajectory.joint_names.append("r_forearm_roll_joint")
-    goal.trajectory.joint_names.append("r_wrist_flex_joint")
-    goal.trajectory.joint_names.append("r_wrist_roll_joint")
+    goal.trajectory.joint_names.append(arm_side + "_shoulder_pan_joint")
+    goal.trajectory.joint_names.append(arm_side + "_shoulder_lift_joint")
+    goal.trajectory.joint_names.append(arm_side + "_upper_arm_roll_joint")
+    goal.trajectory.joint_names.append(arm_side + "_elbow_flex_joint")
+    goal.trajectory.joint_names.append(arm_side + "_forearm_roll_joint")
+    goal.trajectory.joint_names.append(arm_side + "_wrist_flex_joint")
+    goal.trajectory.joint_names.append(arm_side + "_wrist_roll_joint")
     
-    # First trajectory point
-    # Positions
-    ind = 0
-    #print goal.trajectory.points
-    point1 = JointTrajectoryPoint()
-    point2 = JointTrajectoryPoint()
-    goal.trajectory.points = [point1]
-    #goal.trajectory.points[ind].positions.resize(7)
-    point1.positions = joints_p
-    point1.velocities = [0.0,0.0,0.0,0.0,0.0,0.0,0.0]
-    
-    #To be reached 1 second after starting along the trajectory
-    goal.trajectory.points[ind].time_from_start = rospy.Duration(2.0)
+    goal.trajectory.points = []
 
-    goal.trajectory.header.stamp = rospy.Time.now()+rospy.Duration(2.0)        
+    # Positions
+    for ind in xrange(len(joints_p)):
+        point = JointTrajectoryPoint()
+
+        point.positions = joints_p[ind]
+        point.velocities = [0.0,0.0,0.0,0.0,0.0,0.0,0.0]
+        goal.trajectory.points.append(point)
+        #To be reached 1 second after starting along the trajectory
+        goal.trajectory.points[ind].time_from_start = rospy.Duration(1.5)*ind
+
+    goal.trajectory.header.stamp = rospy.Time.now()+rospy.Duration(.5)        
     return goal
+
+wave = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
+        [0.1, 0.3,  0.0, -1.8,  0.0,  0.0,   0.3],
+        [0.1, 0.2, 0.0, -0.8, 0.0, 0.0, 0.0],
+        [0.1, 0.3,  0.0, -1.8,  0.0,  0.0,   0.3],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
+
 
 def listener():
     rospy.init_node('mastermind', anonymous=True)
-    l_client = actionlib.SimpleActionClient('r_arm_controller/joint_trajectory_action', JointTrajectoryAction)
+    l_client = actionlib.SimpleActionClient('l_arm_controller/joint_trajectory_action', JointTrajectoryAction)
     l_client.wait_for_server()
-    l_client.send_goal(create_goal([0.0,0.0,0.0,0.0,0.0,0.0,0.0]))
+    l_client.send_goal(create_goal(wave, 'l'))
     #l_client.send_goal(create_goal([-0.3,0.2,-0.1,-1.2,1.5,-0.3,0.5]))
     print l_client
     # Goal
