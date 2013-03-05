@@ -1,0 +1,14 @@
+<launch>
+  <!-- Launch openni_launch -->
+  <include file="/opt/ros/fuerte/stacks/openni_launch/launch/openni.launch" />
+  <!-- Run openni_tracker -->
+  <node pkg="openni_tracker" type="openni_tracker" name="tracker" />
+  <!-- Run rviz -->
+  <node pkg="rviz" type="rviz" name="rviz" />
+  <!-- Run image_view -->
+  <node pkg="image_view" type="disparity_view" name="viewer" output="screen" >
+    <remap from="image" to="/camera/depth/disparity"/> 
+  </node>
+  <!-- Run tf_listener -->
+  <node pkg="learning_tf" type="tf_listener.py" name="listener" output="screen"/>
+</launch>
