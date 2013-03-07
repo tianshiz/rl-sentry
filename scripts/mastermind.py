@@ -42,6 +42,8 @@ def create_goal(joints_p, arm_side = 'r'):
     goal.trajectory.header.stamp = rospy.Time.now()+rospy.Duration(.5)        
     return goal
 
+
+## Encode wave
 wave = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
         [0.1, 0.3,  0.0, -1.8,  0.0,  0.0,   0.3],
         [0.1, 0.2, 0.0, -0.8, 0.0, 0.0, 0.0],
@@ -49,7 +51,7 @@ wave = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
 
 
-def listener():
+def waver():
     rospy.init_node('mastermind', anonymous=True)
     l_client = actionlib.SimpleActionClient('l_arm_controller/joint_trajectory_action', JointTrajectoryAction)
     l_client.wait_for_server()
@@ -69,4 +71,4 @@ if __name__ == '__main__':
     print rospy.get_param('/r_arm_controller/joints')
 
 
-    listener()
+    waver()
