@@ -68,6 +68,58 @@ def moveArmTo(p, arm_side = 'r'):
     x0, r0 = getHandPos(arm_side)
     pass
 
+## Sharpshooter
+def bulletPhysics():
+    """ Stocastic initial speed """
+    f = (1,0,0)
+    return f
+
+def practiceShootGazebo(target, arm):
+    """ Simulate Shooting
+
+    set the gazebo Simulation
+    run init
+    return whatever the target is hit
+    """
+    ## Set Target
+
+    ## Set arm/hand position
+
+    ## Create bullet + physics
+    # Rotate bullet to direction of hand
+
+    # Start Simulation
+
+    # Verify if hit
+
+    # De-spawn target and bullet
+    # Return hit (or minimal distance)
+    pass
+
+def createTrainingSet(n = 100):
+    trainSet = []
+    for i in xrange(n):
+        ## Decide target position
+        ## Decide hand position
+        hit = practiceShootGazebo()
+        ## Save trial
+    return trainSet
+
+def trainSharpshooter():
+    """ Train at sharpshooting
+
+    TODO decide learning method
+    TODO save final state on disk
+
+    """
+    ## Gather Training set
+    ## Update policy/model/decider/filter
+    ## return/init model
+    pass
+
+def aimSharpshooter(target):
+    ## Return joints / handposition / posegoal to hit the target
+    pass
 
 ### Encoded Actions
 ## Encode wave
@@ -83,10 +135,20 @@ def robotWave():
     #l_client.send_goal(create_goal([-0.3,0.2,-0.1,-1.2,1.5,-0.3,0.5]))
 
 def robotShoot():
+    """ Press the trigger
+
+    """
     moveGrip(0.08)
     r_g_controller.wait_for_result()
     moveGrip(0)
 
+def shootTarget(target):
+    ## Verify training works
+    ## predict trajectory of the target using track_predictor
+    ## decide where to aim
+    goal = aimSharpshooter(target)
+    ## schedule arm movement and trigger
+    ## shoot
 
 def test():
     ## Get List of Arms Joints
