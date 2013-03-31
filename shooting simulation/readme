@@ -1,0 +1,10 @@
+roslaunch gazebo_worlds empty_world.launch
+#pause gazebo
+#insert PR2, set pose all vals to 0, by default uses global gravity settings
+rosrun gazebo spawn_model -file bullet.urdf -urdf -x .7697 -y -.188 -z .9 -model bullet13
+#puts bullet ontop of right wrist roll link
+#shoots it forward in x direction, make
+rosrun gazebo spawn_model -file bullet.urdf -urdf -x .7697 -y -.188 -z .9 -model bullet1
+rosservice call gazebo/apply_body_wrench '{body_name: "bullet12::my_box" , wrench: { force: { x: 0.4, y: 0, z: 0 } , torque: { x: 0.0, y: 0 , z: 0 } }, start_time: 10000000000, duration: 1000000000 }'
+#run gazebo
+
