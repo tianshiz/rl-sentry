@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-""" Mastermind.py
+""" Arm Movement
 
-sentrybot
+Controls robot arm and gripper
 """
 
 import roslib; roslib.load_manifest('ros_sentry')
@@ -49,15 +49,7 @@ def create_goal(joints_p, arm_side = 'r'):
     return goal
 
 
-## Encode wave
-wave = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
-        [0.1, 0.3,  0.0, -1.8,  0.0,  0.0,   0.3],
-        [0.1, 0.2, 0.0, -0.8, 0.0, 0.0, 0.0],
-        [0.1, 0.3,  0.0, -1.8,  0.0,  0.0,   0.3],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
-
-
-def getArmPos(arm_side = 'r'):
+def getHandPos(arm_side = 'r'):
     tf_listener.waitForTransform('/' + arm_side + '_wrist_roll_link', '/base_footprint', rospy.Time(0),rospy.Time(3))
     (trans,rot) = tf_listener.lookupTransform('/' + arm_side + '_wrist_roll_link', '/base_footprint', rospy.Time(0))
     return trans, rot
@@ -67,24 +59,114 @@ def moveGrip(p = 0.08, arm_side = 'r'):
     open.command.position = p
     open.command.max_effort = -1.0
     r_g_controller.send_goal(open)
-    
 
-def waver():
+def moveArmTo(p, arm_side = 'r'):
+    """ Set arm to position 
+
+    either use IK or inhouse IK
+    """
+    x0, r0 = getHandPos(arm_side)
+    pass
+
+## Sharpshooter
+def bulletPhysics():
+    """ Stocastic initial speed """
+    f = (1,0,0)
+    return f
+
+def practiceShootGazebo(target, arm):
+    """ Simulate Shooting
+
+    set the gazebo Simulation
+    run init
+    return whatever the target is hit
+    """
+    ## Set Target
+
+    ## Set arm/hand position
+
+    ## Create bullet + physics
+    # Rotate bullet to direction of hand
+
+    # Start Simulation
+
+    # Verify if hit
+
+    # De-spawn target and bullet
+    # Return hit (or minimal distance)
+    pass
+
+def createTrainingSet(n = 100):
+    trainSet = []
+    for i in xrange(n):
+        ## Decide target position
+        ## Decide hand position
+        hit = practiceShootGazebo()
+        ## Save trial
+    return trainSet
+
+def trainSharpshooter():
+    """ Train at sharpshooting
+
+    TODO decide learning method
+    TODO save final state on disk
+
+    """
+    ## Gather Training set
+    ## Update policy/model/decider/filter
+    ## return/init model
+    pass
+
+def aimSharpshooter(target):
+    ## Return joints / handposition / posegoal to hit the target
+    pass
+
+### Encoded Actions
+## Encode wave
+wave = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
+        [0.1, 0.3,  0.0, -1.8,  0.0,  0.0,   0.3],
+        [0.1, 0.2, 0.0, -0.8, 0.0, 0.0, 0.0],
+        [0.1, 0.3,  0.0, -1.8,  0.0,  0.0,   0.3],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
+
+
+def robotWave():
     l_controller.send_goal(create_goal(wave, 'l'))
     #l_client.send_goal(create_goal([-0.3,0.2,-0.1,-1.2,1.5,-0.3,0.5]))
 
-    # Goal
-   
+def robotShoot():
+    """ Press the trigger
 
-    #rospy.Subscriber("chatter", String, callback)
-    
-    #rospy.spin()
+    """
+    moveGrip(0.08)
+    r_g_controller.wait_for_result()
+    moveGrip(0)
 
+def shootTarget(target):
+    ## Verify training works
+    ## predict trajectory of the target using track_predictor
+    ## decide where to aim
+    goal = aimSharpshooter(target)
+    ## schedule arm movement and trigger
+    ## shoot
 
+def test():
+    ## Get List of Arms Joints
+    print rospy.get_param('/r_gripper_controller/joint')
+
+    print getHandPos(arm_side = 'r')
+    rospy.loginfo(rospy.get_name() + ": I'm waving to you")
+    robotWave()
+    moveGrip(0.08)
+    r_g_controller.wait_for_result()
+    moveGrip(0)
+    print getHandPos(arm_side = 'r')
 
 if __name__ == '__main__':
     rospy.init_node('arm_movement', anonymous=True)
     ## Init servers
+    global l_controller, r_controller, r_g_controller, tf_listener
+
     l_controller = actionlib.SimpleActionClient('l_arm_controller/joint_trajectory_action', JointTrajectoryAction)
     l_controller.wait_for_server()
     r_controller = actionlib.SimpleActionClient('r_arm_controller/joint_trajectory_action', JointTrajectoryAction)
@@ -94,14 +176,5 @@ if __name__ == '__main__':
 
     tf_listener = tf.TransformListener()
 
-    ## Get List of Arms Joints
-    print rospy.get_param('/r_gripper_controller/joint')
-
-    print getArmPos(arm_side = 'r')
-    rospy.loginfo(rospy.get_name() + ": I'm waving to you")
-    waver()
-    moveGrip(0.08)
-    r_g_controller.wait_for_result()
-    moveGrip(0)
-    print getArmPos(arm_side = 'r')
+    
     
