@@ -15,6 +15,7 @@
   <depend package="pr2_controllers_msgs"/>
   <depend package="openni_camera"/>
   <depend package="openni_tracker"/>
+  <depend package="kdl"/>
 
 </package>
 
