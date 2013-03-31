@@ -29,6 +29,7 @@ def save_frame(behav, frame, win, listener, tail):
   now = rospy.Time(0)
   
   # iterate over joints to find their position and orientation in current frame
+  i = 1
   for j in JOINTS:
     (position,quaternion) = listener.lookupTransform("/"+j+"_1", "/openni_depth_frame", now)
     x,y,z = position
@@ -36,9 +37,14 @@ def save_frame(behav, frame, win, listener, tail):
     f = Frame(Rotation.Quaternion(Qx,Qy,Qz,Qw),Vector(x,y,z))    
     
     # append orientation and position data for current joing to frame_string
-    frame_string += ",%f,%f,%f,%f,%f,%f,%f,%f,%f,1"%(f.M[0,0], f.M[0,1], f.M[0,2], f.M[1,0], f.M[1,1], f.M[1,2], f.M[2,0], f.M[2,1], f.M[2,2])
-    frame_string += ",%f,%f,%f,1\n"%(position)
-  
+    if i < 12:
+      frame_string += ",%f,%f,%f,%f,%f,%f,%f,%f,%f,1"%(f.M[0,0], f.M[0,1], f.M[0,2], f.M[1,0], f.M[1,1], f.M[1,2], f.M[2,0], f.M[2,1], f.M[2,2])
+    frame_string += ",%f,%f,%f,1"%(position)
+    i += 1  
+
+ 
+  frame_string += "\n"
+ 
   # append frame_string to end of file
   f = open('%s_%d.txt'%(behav,tail), 'a')
   f.write(frame_string)
