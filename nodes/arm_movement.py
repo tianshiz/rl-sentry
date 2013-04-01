@@ -6,18 +6,22 @@ Controls robot arm and gripper
 
 import roslib; roslib.load_manifest('ros_sentry')
 import rospy
-import tf
+import PyKDL
 
+import tf
 import actionlib
 
 from std_msgs.msg import String
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Twist, Wrench, Point
 from pr2_controllers_msgs.msg import JointTrajectoryAction, JointTrajectoryGoal
 from trajectory_msgs.msg import JointTrajectoryPoint
 
 from pr2_controllers_msgs.msg import Pr2GripperCommandAction, Pr2GripperCommandGoal
     
-
+SPAWN_SCRIPT   ='python /opt/ros/groovy/stacks/simulator_gazebo/gazebo/scripts/spawn_model -file bullet.urdf -urdf'
+WRENCH_SERVICE ='/opt/ros/groovy/stacks/simulator_gazebo/gazebo_msgs/srv/ApplyBodyWrench.srv'
+    
+    
 SH_CONTROLLERS = {
     'r': '/r_arm_controller/joints',
     'l': '/l_arm_controller/joints',
@@ -52,7 +56,7 @@ def create_goal(joints_p, arm_side = 'r'):
 def getHandPos(arm_side = 'r'):
     tf_listener.waitForTransform('/' + arm_side + '_wrist_roll_link', '/base_footprint', rospy.Time(0),rospy.Time(3))
     (trans,rot) = tf_listener.lookupTransform('/' + arm_side + '_wrist_roll_link', '/base_footprint', rospy.Time(0))
-    return trans, rot
+    return trans, pyKdl.Rotation.RPY(rot)
 
 def moveGrip(p = 0.08, arm_side = 'r'):
     open = Pr2GripperCommandGoal()
@@ -70,8 +74,17 @@ def moveArmTo(p, arm_side = 'r'):
 
 ## Sharpshooter
 def bulletPhysics():
-    """ Stocastic initial speed """
-    f = (1,0,0)
+    """ Stocastic initial speed
+
+    return the initial speed, as a vector, oriented along the x axis"""
+    
+    ## Simulation Parameters
+    v0 = 17.8 ## ms
+    angles = 0.017 ## rad
+    
+    theta = random.rand()*pi
+    phi = random.normal(scale = angles)
+    f = r_[cos(phi),sin(phi)*cos(theta),sin(phi)*sin(theta)]*v0
     return f
 
 def practiceShootGazebo(target, arm):
@@ -86,8 +99,29 @@ def practiceShootGazebo(target, arm):
     ## Set arm/hand position
 
     ## Create bullet + physics
+    bullet_n = 1
     # Rotate bullet to direction of hand
-
+    x0, r0 = getHandPos(arm_side)
+    
+    os.system(SPAWN_SCRIPT + ' -x %f -y %f -z %f'%x0 + '-Y %f -R %f - P %f'%r0.getRPY() +' -model bullet'+bullet_n)
+    bullet_number = bullet_n + 1
+    
+    wrench = Wrench() # Message to apply forces in Gazebo
+    dt = 0.03 # impulse duration
+    f = gun2hand * bulletPhysics() # Generate initial speed
+    f = projectile_m * f/dt # "convert" speed in a force
+    
+    wrench.force.x = f[0]
+    wrench.force.y = f[1]
+    wrench.force.z = f[2]
+    
+    try:
+        resp1 = apply_wrench_server('bullet'+bullet_n, '',
+                                    point = Point(x0[0], x0[1], x0[2]), wrench,
+                                    rospy.Time.now(), rospy.Duration(dt))
+    except rospy.ServiceException, e:
+        print "Service did not process request: %s"%str(e)
+        
     # Start Simulation
 
     # Verify if hit
@@ -97,6 +131,7 @@ def practiceShootGazebo(target, arm):
     pass
 
 def createTrainingSet(n = 100):
+    
     trainSet = []
     for i in xrange(n):
         ## Decide target position
@@ -162,10 +197,17 @@ def test():
     moveGrip(0)
     print getHandPos(arm_side = 'r')
 
+## Robot knowledge
+hand2gun = pyKDL.Rotation.EulerZYX(0.8,0,0)
+gun2hand = hand2gun.Inverse()
+ikinematics = None
+
+projectile_m = 0.0013  # From URDF file 
+
 if __name__ == '__main__':
     rospy.init_node('arm_movement', anonymous=True)
     ## Init servers
-    global l_controller, r_controller, r_g_controller, tf_listener
+    global l_controller, r_controller, r_g_controller, tf_listener, apply_wrench_server
 
     l_controller = actionlib.SimpleActionClient('l_arm_controller/joint_trajectory_action', JointTrajectoryAction)
     l_controller.wait_for_server()
@@ -176,5 +218,6 @@ if __name__ == '__main__':
 
     tf_listener = tf.TransformListener()
 
+    apply_wrench_server = rospy.ServiceProxy('/gazebo/apply_body_wrench', ApplyBodyWrench)
     
     
