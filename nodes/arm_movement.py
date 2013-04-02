@@ -17,7 +17,11 @@ from pr2_controllers_msgs.msg import JointTrajectoryAction, JointTrajectoryGoal
 from trajectory_msgs.msg import JointTrajectoryPoint
 
 from pr2_controllers_msgs.msg import Pr2GripperCommandAction, Pr2GripperCommandGoal
-    
+
+from gazebo_srvs.srv import DeleteModel
+
+import track_predictor
+
 SPAWN_SCRIPT   ='python /opt/ros/groovy/stacks/simulator_gazebo/gazebo/scripts/spawn_model -file bullet.urdf -urdf'
 WRENCH_SERVICE ='/opt/ros/groovy/stacks/simulator_gazebo/gazebo_msgs/srv/ApplyBodyWrench.srv'
     
@@ -87,28 +91,33 @@ def bulletPhysics():
     f = r_[cos(phi),sin(phi)*cos(theta),sin(phi)*sin(theta)]*v0
     return f
 
-def practiceShootGazebo(target, arm):
+def practiceShootGazebo(target):
     """ Simulate Shooting
 
     set the gazebo Simulation
     run init
     return whatever the target is hit
     """
+    ## Gazebo Services
+    deleteModel = rospy.ServiceProxy('gazebo/delete_model', DeleteModel)
+    rospy.Subscriber("contact_bumper/status", String, callback) ## topic providing collision
+    
     ## Set Target
 
     ## Set arm/hand position
 
     ## Create bullet + physics
     bullet_n = 1
+    model_name = 'bullet'+bullet_n
     # Rotate bullet to direction of hand
     x0, r0 = getHandPos(arm_side)
     
-    os.system(SPAWN_SCRIPT + ' -x %f -y %f -z %f'%x0 + '-Y %f -R %f - P %f'%r0.getRPY() +' -model bullet'+bullet_n)
+    os.system(SPAWN_SCRIPT + ' -x %f -y %f -z %f'%x0 + '-Y %f -R %f - P %f'%r0.getRPY() +' -model '+model_name)
     bullet_number = bullet_n + 1
     
     wrench = Wrench() # Message to apply forces in Gazebo
     dt = 0.03 # impulse duration
-    f = gun2hand * bulletPhysics() # Generate initial speed
+    f = r0.Inverse() * gun2hand * bulletPhysics() # Generate initial speed
     f = projectile_m * f/dt # "convert" speed in a force
     
     wrench.force.x = f[0]
@@ -116,7 +125,7 @@ def practiceShootGazebo(target, arm):
     wrench.force.z = f[2]
     
     try:
-        resp1 = apply_wrench_server('bullet'+bullet_n, '',
+        resp1 = apply_wrench_server(model_name, '',
                                     point = Point(x0[0], x0[1], x0[2]), wrench,
                                     rospy.Time.now(), rospy.Duration(dt))
     except rospy.ServiceException, e:
@@ -124,12 +133,34 @@ def practiceShootGazebo(target, arm):
         
     # Start Simulation
 
-    # Verify if hit
+    ## Verify if hit
+    targetHit = False
+    
+    deleteModel(model_name) # De-spawn target and bullet
+    
+    return targetHit  # Return hit (or minimal distance)
 
-    # De-spawn target and bullet
-    # Return hit (or minimal distance)
-    pass
-
+def practiceShootTheory(target):
+    """ Predict trajectory of bullet using physics filter 
+    
+    target is a position
+    """
+    
+    x, r0 = getHandPos(arm_side)
+    v = r0.Inverse() * gun2hand * bulletPhysics()   # Generate initial speed
+    a = (0, 0, -9.8)
+    dt = 0.1
+    
+    dist_min = 9999
+    t_min = 0
+    
+    for i in xrange(300):
+        x, v = x + v * dt, v + a * dt
+        if sqrt(sum(x-target)**2) < dist_min:
+            t_min = i*dt
+            
+    return t_min, dist_min
+    
 def createTrainingSet(n = 100):
     
     trainSet = []
@@ -196,6 +227,8 @@ def test():
     r_g_controller.wait_for_result()
     moveGrip(0)
     print getHandPos(arm_side = 'r')
+    
+    
 
 ## Robot knowledge
 hand2gun = pyKDL.Rotation.EulerZYX(0.8,0,0)
