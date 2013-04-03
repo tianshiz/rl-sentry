@@ -10,10 +10,18 @@ roslib.load_manifest('ros_sentry')
 
 from numpy import array
 import PyKDL
+from matplotlib import pyplot
+import pylab
+from mpl_toolkits.mplot3d import Axes3D
 
 ## first rot + pos, only pos
 joint_n = (11,4)
 torso_j = 2
+l_shoulder = 3
+r_shoulder = 5
+l_hip = 7
+r_hip = 9
+
 
 def loadPose(pose_filename):
     """ 
@@ -37,7 +45,7 @@ def loadPose(pose_filename):
             break
         joints = [[PyKDL.Rotation(1,0,0,0,1,0,0,0,1),
                    PyKDL.Vector(0,0,0)]]*15
-        data = array([float(v) for v in line[:-2].split(',')])
+        data = array([float(v) for v in line.strip("\n").split(',')])
         
         index = 1
         for j in xrange(joint_n[0]):
@@ -69,6 +77,14 @@ def extractRelPosition(frame):
     """
     return frame[torso_j]
 
+def extractAvgPosition(frame):
+
+    x_avg = (frame[torso_j][1][0]+frame[l_shoulder][1][0]+frame[r_shoulder][1][0]+frame[l_hip][1][0]+frame[r_hip][1][0])/5.0
+    y_avg = (frame[torso_j][1][1]+frame[l_shoulder][1][1]+frame[r_shoulder][1][1]+frame[l_hip][1][1]+frame[r_hip][1][1])/5.0
+    z_avg = (frame[torso_j][1][2]+frame[l_shoulder][1][2]+frame[r_shoulder][1][2]+frame[l_hip][1][2]+frame[r_hip][1][2])/5.0
+
+    return (x_avg, y_avg, z_avg)
+
 def extractPoseFeature(frames):
     """ Extract the pose feature 
 
@@ -86,11 +102,60 @@ def extractPoseFeature(frames):
 def training(train_set):
     pass
 
+def showSkeleton(frame):
+    #fig = pylab.figure("skel")
+    #ax = Axes3D(fig)
+   
+    x = []
+    y = []
+    z = []
+    for i in xrange(15): 
+      print frame[i][1][0], frame[i][1][1], frame[i][1][2] 
+      x.append(frame[i][1][0])
+      y.append(frame[i][1][1])
+      z.append(frame[i][1][2])
+ 
+    
+    pylab.gca().plot(x, y, z, marker='o')
+    
+
 def test():
-    f = loadPose('data/0510175431.txt')
-    print f[0]
-    f2 = extractPoseFeature(f[:2])
-    print f2
-    print len(f2)
+    f = loadPose('hostile_1.txt')
+    f2 = loadPose('../data/approach1.txt')
+    #print f[0]
+    #f2 = extractPoseFeature(f[:2])
+    #print f2
+    #print len(f2)
+    x = []
+    y = []
+    z = []
+    x2 = []
+    y2 = []
+    z2 = []
+    fig = pylab.figure()
+    ax = Axes3D(fig)
+    showSkeleton(f[00])
+    showSkeleton(f[50])
+    showSkeleton(f[100])
+    pyplot.show()
+    for i in f2:
+      t_p = extractAvgPosition(i)
+      x.append(t_p[0])
+      y.append(t_p[1])
+      z.append(t_p[2])
+    for i in f2:
+      t_p = extractRelPosition(i)[1]
+      x2.append(t_p[0])
+      y2.append(t_p[1])
+      z2.append(t_p[2])
+
+
+    fig = pylab.figure()
+    ax = Axes3D(fig)
+   
+    ax.plot(x, y, z, marker='o')
+    ax.plot(x2, y2, z2, marker ='o')
+    #pyplot.show()
 
 test()
+
