@@ -52,7 +52,7 @@ def loadPose(pose_filename):
             joints[j]=[PyKDL.Rotation(*data[index:index+9]),  # rotation matrix
                        PyKDL.Vector(*data[index+10:index+13])]              # position
             index = index + 14
-        for j in xrange(joint_n[0], joint_n[1]):
+        for j in xrange(joint_n[0], joint_n[0]+joint_n[1]):
             joints[j]=[PyKDL.Rotation(1,0,0,0,1,0,0,0,1),
                        PyKDL.Vector(*data[index:index+3])]              # position
             index = index + 4
@@ -102,60 +102,68 @@ def extractPoseFeature(frames):
 def training(train_set):
     pass
 
-def showSkeleton(frame):
-    #fig = pylab.figure("skel")
-    #ax = Axes3D(fig)
-   
+def addSkeleton(frame):
     x = []
     y = []
     z = []
-    for i in xrange(15): 
+    for i in [0,1,2,3,4,11,4,3,1,5,6,12,6,5,2,7,8,13,8,7,2,9,7,9,10,14]: 
       print frame[i][1][0], frame[i][1][1], frame[i][1][2] 
       x.append(frame[i][1][0])
       y.append(frame[i][1][1])
       z.append(frame[i][1][2])
- 
-    
+     
     pylab.gca().plot(x, y, z, marker='o')
-    
 
-def test():
-    f = loadPose('hostile_1.txt')
-    f2 = loadPose('../data/approach1.txt')
-    #print f[0]
-    #f2 = extractPoseFeature(f[:2])
-    #print f2
-    #print len(f2)
+def showSkeletons(frames):
+    fig = pylab.figure()
+    ax = Axes3D(fig)
+
+    for f in frames:
+      addSkeleton(f)
+
+    ax.set_xlim(0,3)
+    ax.set_ylim(-1,1)
+    ax.view_init(0,-180)
+    pyplot.show()
+
+def addPath(frames):
     x = []
     y = []
     z = []
-    x2 = []
-    y2 = []
-    z2 = []
-    fig = pylab.figure()
-    ax = Axes3D(fig)
-    showSkeleton(f[00])
-    showSkeleton(f[50])
-    showSkeleton(f[100])
-    pyplot.show()
-    for i in f2:
-      t_p = extractAvgPosition(i)
+    for f in frames:
+      t_p = extractRelPosition(f)[1]
       x.append(t_p[0])
       y.append(t_p[1])
       z.append(t_p[2])
-    for i in f2:
-      t_p = extractRelPosition(i)[1]
-      x2.append(t_p[0])
-      y2.append(t_p[1])
-      z2.append(t_p[2])
 
+    pylab.gca().plot(x, y, z, marker='o')
+
+def trackPaths(frames):
 
     fig = pylab.figure()
     ax = Axes3D(fig)
-   
-    ax.plot(x, y, z, marker='o')
-    ax.plot(x2, y2, z2, marker ='o')
-    #pyplot.show()
+
+    for f in frames:
+      addPath(f)  
+ 
+    ax.set_xlim(0,3)
+    ax.set_ylim(-1,1)
+    ax.view_init(90,-180)
+    pyplot.show()
+
+def test():
+    f = loadPose('../data/approach1.txt')
+    f2 = loadPose('../data/approach2.txt')
+    f3 = loadPose('../data/approach3.txt')
+    f4 = loadPose('../data/approach4.txt')
+    f5 = loadPose('../data/approach5.txt')
+    f6 = loadPose('../data/approach6.txt')
+    #f2 = extractPoseFeature(f[:2])
+    #print f2
+    #print len(f2)
+    showSkeletons([f[00],f[20],f[40],f[60]])
+
+#    trackPaths([f,f2,f3,f4,f5,f6])
 
 test()
 
