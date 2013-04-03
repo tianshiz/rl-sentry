@@ -1,12 +1,15 @@
 """ Tracking predictor
 
 Using Kalman Filter, predicts the position of a target in the future
-
+we dont know the current input(u), only have measurement z,
 TODO Evaluate A,Q,H,R
 
 TODO A should be learn rather then set by hand
 TODO Does state need momentum (probably yes NdAF)?
 """
+import os
+import sys
+import numpy
 from numpy import *
 
 
@@ -17,13 +20,14 @@ def KalmanStep(x,p,  z_past = [], step_future = 0):
     z_past is the sequence of measurement
     step_future is the number of iteration in the future
     """
-    I = eye(len(x0))
+    I = eye(4)
     
     A = KalmanStep.A
     Q = KalmanStep.Q 
     H = KalmanStep.H 
     R = KalmanStep.R 
-
+    x_old=x
+    p_old=p
     for z in z_past:
         ## Time Update
         x_ = dot(A, x_old)
@@ -35,6 +39,8 @@ def KalmanStep(x,p,  z_past = [], step_future = 0):
     
         #z = dot(H,x_old) 
         x = x_ + dot(k,(z-dot(H,x_)))
+        x_old=x
+        p_old=p
     
     for t in xrange(step_future):
         ## Time Update
@@ -64,15 +70,29 @@ def init():
     ## Init the parameters
     sample_rate = 10 
 
-    KalmanStep.A = eye(3)
-    KalmanStep.Q = eye(3)
-    KalmanStep.H = eye(3)
-    KalmanStep.R = eye(3)
+    KalmanStep.A = numpy.array([[1,0 ,.1, 0],[0, 1 ,0 ,.1],[0, 0 ,1 ,0],[0, 0 ,0 ,1]])
+    KalmanStep.Q = eye(4)
+    KalmanStep.H = eye(4)
+    KalmanStep.R = eye(4)
 
 if __name__ == '__main__':
     ## Init node
-
+    init()
     ## Create publisher
-
+    z_past=[]
     ## Run it
-    pass
+    with open('approach1_path.txt','r') as f:
+        read_data=f.readlines()
+    for line in read_data:
+        line=line[:-1] #remove /n char
+        line=line.split(',') #convert to list
+        x=line[0]
+        y=line[1]
+        vx=line[2]
+        vy=line[3]
+        z_past.extend([[x ,y ,vx, vy]])
+    x=numpy.array([z_past[0][0],z_past[0][1],z_past[0][2],z_past[0][3]]).T
+    p=eye(4)
+    for i in xrange(0,len(z_past)):
+        [z,x]=KalmanStep(x,p,  z_past, 1)
+   
