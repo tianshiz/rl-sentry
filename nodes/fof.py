@@ -36,6 +36,7 @@ def loadPose(pose_filename):
                 0,1,2,3,4,5,6,7,8,CONF
     P(i)   => position of ith joint followed by CONF
                 x,y,z,CONF  """
+
     pose_file = open(pose_filename,'r')
 
     frames = []
@@ -151,6 +152,23 @@ def trackPaths(frames):
     ax.view_init(90,-180)
     pyplot.show()
 
+def saveTrajectory(pose_filename):
+    dt = .1
+    frames = loadPose(pose_filename)
+    
+    traj_filename = pose_filename[:-4]+'_path.txt'
+    traj = open(traj_filename,'w')
+    traj.close()
+    traj = open(traj_filename,'a') 
+
+    for f in xrange(len(frames)):
+      t_p = extractRelPosition(frames[f])[1]
+      if f==0:
+        traj.write("%f,%f,%f,%f\n"%(t_p[0],t_p[1],0,0))
+      else:
+        t_p_ = extractRelPosition(frames[f-1])[1]
+        traj.write("%f,%f,%f,%f\n"%(t_p[0],t_p[1],(t_p[0]-t_p_[0])/dt,(t_p[1]-t_p_[1])/dt))
+
 def test():
     f = loadPose('../data/approach1.txt')
     f2 = loadPose('../data/approach2.txt')
@@ -161,9 +179,10 @@ def test():
     #f2 = extractPoseFeature(f[:2])
     #print f2
     #print len(f2)
-    showSkeletons([f[00],f[20],f[40],f[60]])
-
+#    showSkeletons([f[00],f[20],f[40],f[60]])
+#    saveTrajectory('../data/approach1.txt')
 #    trackPaths([f,f2,f3,f4,f5,f6])
+    trackPaths([f])
 
 test()
 
