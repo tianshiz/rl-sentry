@@ -179,10 +179,10 @@ def test():
     #f2 = extractPoseFeature(f[:2])
     #print f2
     #print len(f2)
-#    showSkeletons([f[00],f[20],f[40],f[60]])
-#    saveTrajectory('../data/approach1.txt')
+    showSkeletons([f[00],f2[0],f3[0],f4[0],f5[0],f6[0]])
+#    saveTrajectory('../data/stand1.txt')
 #    trackPaths([f,f2,f3,f4,f5,f6])
-    trackPaths([f])
+#    trackPaths([f])
 
 test()
 

@@ -17,7 +17,7 @@ def KalmanStep(x,p,  z_past = [], step_future = 0):
     z_past is the sequence of measurement
     step_future is the number of iteration in the future
     """
-    I = eye(len(x0))
+    I = eye(4)
     
     A = KalmanStep.A
     Q = KalmanStep.Q 
@@ -64,10 +64,10 @@ def init():
     ## Init the parameters
     sample_rate = 10 
 
-    KalmanStep.A = eye(3)
-    KalmanStep.Q = eye(3)
-    KalmanStep.H = eye(3)
-    KalmanStep.R = eye(3)
+    KalmanStep.A = eye(4)
+    KalmanStep.Q = eye(4)
+    KalmanStep.H = eye(4)
+    KalmanStep.R = eye(4)
 
 if __name__ == '__main__':
     ## Init node
