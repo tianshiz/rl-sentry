@@ -6,9 +6,9 @@ Behaviour predictor
 
 """
 import roslib
-roslib.load_manifest('ros_sentry')
-
-from numpy import array
+roslib.load_manifest('rl-sentry')
+import sys
+from array import array
 import PyKDL
 
 ## first rot + pos, only pos
@@ -37,7 +37,8 @@ def loadPose(pose_filename):
             break
         joints = [[PyKDL.Rotation(1,0,0,0,1,0,0,0,1),
                    PyKDL.Vector(0,0,0)]]*15
-        data = array([float(v) for v in line[:-2].split(',')])
+
+        data = array('f',[float(v) for v in line[:-3].split(',')])
         
         index = 1
         for j in xrange(joint_n[0]):
@@ -87,10 +88,10 @@ def training(train_set):
     pass
 
 def test():
-    f = loadPose('data/0510175431.txt')
-    print f[0]
-    f2 = extractPoseFeature(f[:2])
-    print f2
-    print len(f2)
+    f = loadPose('friendly_1.txt')
 
-test()
+    f2 = extractPoseFeature(f[:2])
+    print f[:2]
+    #print len(f2)
+
+#test()
