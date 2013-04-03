@@ -3,6 +3,9 @@
 
 Controls robot arm and gripper
 """
+import os
+from numpy import random
+from numpy import *
 
 import roslib; roslib.load_manifest('ros_sentry')
 import rospy
@@ -18,11 +21,12 @@ from trajectory_msgs.msg import JointTrajectoryPoint
 
 from pr2_controllers_msgs.msg import Pr2GripperCommandAction, Pr2GripperCommandGoal
 
-from gazebo_srvs.srv import DeleteModel
+from gazebo_msgs.srv import DeleteModel, ApplyBodyWrench, GetLinkState, GetModelState
 
 import track_predictor
 
-SPAWN_SCRIPT   ='python /opt/ros/groovy/stacks/simulator_gazebo/gazebo/scripts/spawn_model -file bullet.urdf -urdf'
+
+SPAWN_SCRIPT   ='python /opt/ros/groovy/stacks/simulator_gazebo/gazebo/scripts/spawn_model -file nodes/bullet.urdf -urdf'
 WRENCH_SERVICE ='/opt/ros/groovy/stacks/simulator_gazebo/gazebo_msgs/srv/ApplyBodyWrench.srv'
     
     
@@ -58,9 +62,10 @@ def create_goal(joints_p, arm_side = 'r'):
 
 
 def getHandPos(arm_side = 'r'):
-    tf_listener.waitForTransform('/' + arm_side + '_wrist_roll_link', '/base_footprint', rospy.Time(0),rospy.Time(3))
-    (trans,rot) = tf_listener.lookupTransform('/' + arm_side + '_wrist_roll_link', '/base_footprint', rospy.Time(0))
-    return trans, pyKdl.Rotation.RPY(rot)
+    now = rospy.Time(0)  #.now()
+    tf_listener.waitForTransform('/' + arm_side + '_wrist_roll_link', '/base_footprint', now, rospy.Duration(10))
+    (trans,rot) = tf_listener.lookupTransform('/' + arm_side + '_wrist_roll_link', '/base_footprint', now)
+    return trans, PyKDL.Rotation.Quaternion(*rot)
 
 def moveGrip(p = 0.08, arm_side = 'r'):
     open = Pr2GripperCommandGoal()
@@ -86,18 +91,21 @@ def bulletPhysics():
     v0 = 17.8 ## ms
     angles = 0.017 ## rad
     
-    theta = random.rand()*pi
+    theta = random.random() * 3.1416
     phi = random.normal(scale = angles)
-    f = r_[cos(phi),sin(phi)*cos(theta),sin(phi)*sin(theta)]*v0
+    f = PyKDL.Vector(cos(phi)*v0,sin(phi)*cos(theta)*v0,sin(phi)*sin(theta)*v0)
     return f
 
 def practiceShootGazebo(target):
     """ Simulate Shooting
 
-    set the gazebo Simulation
-    run init
+    creates a target and shoots the bullet from the current configuration
+    
     return whatever the target is hit
     """
+    def callback(x):
+        print x
+
     ## Gazebo Services
     deleteModel = rospy.ServiceProxy('gazebo/delete_model', DeleteModel)
     rospy.Subscriber("contact_bumper/status", String, callback) ## topic providing collision
@@ -108,11 +116,11 @@ def practiceShootGazebo(target):
 
     ## Create bullet + physics
     bullet_n = 1
-    model_name = 'bullet'+bullet_n
+    model_name = 'bullet%d'%bullet_n
     # Rotate bullet to direction of hand
-    x0, r0 = getHandPos(arm_side)
-    
-    os.system(SPAWN_SCRIPT + ' -x %f -y %f -z %f'%x0 + '-Y %f -R %f - P %f'%r0.getRPY() +' -model '+model_name)
+    x0, r0 = getHandPos('r')
+    print x0
+    os.system(SPAWN_SCRIPT + ' -x %f -y %f -z %f'%x0 + ' -Y %f -R %f - P %f'%r0.GetRPY() +' -model '+model_name)
     bullet_number = bullet_n + 1
     
     wrench = Wrench() # Message to apply forces in Gazebo
@@ -125,20 +133,44 @@ def practiceShootGazebo(target):
     wrench.force.z = f[2]
     
     try:
-        resp1 = apply_wrench_server(model_name, '',
-                                    point = Point(x0[0], x0[1], x0[2]), wrench,
+        resp1 = apply_wrench_server(model_name+'::my_box', '',
+                                    Point(x0[0], x0[1], x0[2]), wrench,
                                     rospy.Time.now(), rospy.Duration(dt))
+        print "shooooot"
     except rospy.ServiceException, e:
         print "Service did not process request: %s"%str(e)
+    
+    ## Start Simulation
+    start_t = rospy.Time(0) #.now()
+    # measure trajectory
+    trajectory = []
+    
+    try:
+        for t in xrange(0,50):
+            p = get_model_server(model_name, '').pose.position
+            trajectory.append((rospy.Time(0),(p.x-target[0], p.y - target[1], p.z - target[2] )) ) 
+            
+    except Exception, e:
         
-    # Start Simulation
+        print "Service did not process request: %s"%str(e)
 
-    ## Verify if hit
-    targetHit = False
+    try:
+        deleteModel(model_name) # De-spawn target and bullet
+        print "deleted"
+    except rospy.ServiceException, e:
+        print "Service did not process request: %s"%str(e)
+
+    ## Find minimal distance
+    dist_min = 9999
+    t_min = 0
+
+    for t,x in trajectory:
+        dist = sqrt(x[0]**2 + x[1]**2 + x[2]**2 )
+        if dist < dist_min:
+            t_min = t
+            dist_min = dist
     
-    deleteModel(model_name) # De-spawn target and bullet
-    
-    return targetHit  # Return hit (or minimal distance)
+    return t_min, dist_min  # Return hit (or minimal distance)
 
 def practiceShootTheory(target):
     """ Predict trajectory of bullet using physics filter 
@@ -228,10 +260,11 @@ def test():
     moveGrip(0)
     print getHandPos(arm_side = 'r')
     
-    
+def test_shoot():
+    print practiceShootGazebo((20,20,20))
 
 ## Robot knowledge
-hand2gun = pyKDL.Rotation.EulerZYX(0.8,0,0)
+hand2gun = PyKDL.Rotation.EulerZYX(0.8,0,0)
 gun2hand = hand2gun.Inverse()
 ikinematics = None
 
@@ -240,7 +273,7 @@ projectile_m = 0.0013  # From URDF file
 if __name__ == '__main__':
     rospy.init_node('arm_movement', anonymous=True)
     ## Init servers
-    global l_controller, r_controller, r_g_controller, tf_listener, apply_wrench_server
+    global l_controller, r_controller, r_g_controller, tf_listener, apply_wrench_server, get_model_server
 
     l_controller = actionlib.SimpleActionClient('l_arm_controller/joint_trajectory_action', JointTrajectoryAction)
     l_controller.wait_for_server()
@@ -251,6 +284,8 @@ if __name__ == '__main__':
 
     tf_listener = tf.TransformListener()
 
-    apply_wrench_server = rospy.ServiceProxy('/gazebo/apply_body_wrench', ApplyBodyWrench)
-    
-    
+    apply_wrench_server = rospy.ServiceProxy('gazebo/apply_body_wrench', ApplyBodyWrench)
+    get_model_server = rospy.ServiceProxy('gazebo/get_model_state', GetModelState)
+    #apply_wrench_server.wait_for_server()
+
+    test_shoot()
