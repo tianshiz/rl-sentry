@@ -7,6 +7,8 @@ import os
 from numpy import random
 from numpy import *
 
+from matplotlib import pylab
+
 import roslib; roslib.load_manifest('ros_sentry')
 import rospy
 import PyKDL
@@ -73,7 +75,7 @@ def moveGrip(p = 0.08, arm_side = 'r'):
     open.command.max_effort = -1.0
     r_g_controller.send_goal(open)
 
-def moveArmTo(p, arm_side = 'r'):
+def moveHandTo(p, arm_side = 'r'):
     """ Set arm to position 
 
     either use IK or inhouse IK
@@ -93,40 +95,38 @@ def bulletPhysics():
     
     theta = random.random() * 3.1416
     phi = random.normal(scale = angles)
-    f = PyKDL.Vector(cos(phi)*v0,sin(phi)*cos(theta)*v0,sin(phi)*sin(theta)*v0)
+    f = PyKDL.Vector(cos(phi)*v0, sin(phi)*cos(theta)*v0, sin(phi)*sin(theta)*v0)
     return f
 
 def practiceShootGazebo(target):
     """ Simulate Shooting
 
-    creates a target and shoots the bullet from the current configuration
+    target is a Point / tuple
     
-    return whatever the target is hit
+    shoots the bullet from the current configuration
+    
+    
+    return the closes point of the trajectory and its time
     """
-    def callback(x):
-        print x
 
     ## Gazebo Services
     deleteModel = rospy.ServiceProxy('gazebo/delete_model', DeleteModel)
-    rospy.Subscriber("contact_bumper/status", String, callback) ## topic providing collision
     
-    ## Set Target
 
     ## Set arm/hand position
 
     ## Create bullet + physics
-    bullet_n = 1
-    model_name = 'bullet%d'%bullet_n
+    model_name = 'bullet1'
     # Rotate bullet to direction of hand
     x0, r0 = getHandPos('r')
-    print x0
+    r0 = hand2gun * r0
+    
     os.system(SPAWN_SCRIPT + ' -x %f -y %f -z %f'%x0 + ' -Y %f -R %f - P %f'%r0.GetRPY() +' -model '+model_name)
-    bullet_number = bullet_n + 1
     
     wrench = Wrench() # Message to apply forces in Gazebo
-    dt = 0.03 # impulse duration
-    f = r0.Inverse() * gun2hand * bulletPhysics() # Generate initial speed
-    f = projectile_m * f/dt # "convert" speed in a force
+    dt = 0.03         # impulse duration
+    f = gun2hand * r0.Inverse() * bulletPhysics() # Generate initial speed
+    f = projectile_m * f/dt                       # "convert" speed in a force
     
     wrench.force.x = f[0]
     wrench.force.y = f[1]
@@ -136,7 +136,7 @@ def practiceShootGazebo(target):
         resp1 = apply_wrench_server(model_name+'::my_box', '',
                                     Point(x0[0], x0[1], x0[2]), wrench,
                                     rospy.Time.now(), rospy.Duration(dt))
-        print "shooooot"
+        
     except rospy.ServiceException, e:
         print "Service did not process request: %s"%str(e)
     
@@ -144,19 +144,16 @@ def practiceShootGazebo(target):
     start_t = rospy.Time(0) #.now()
     # measure trajectory
     trajectory = []
-    
     try:
         for t in xrange(0,50):
+            ## wait 0.1 secs
             p = get_model_server(model_name, '').pose.position
-            trajectory.append((rospy.Time(0),(p.x-target[0], p.y - target[1], p.z - target[2] )) ) 
-            
+            trajectory.append((rospy.Time(0) - start_t, (p.x-target[0], p.y - target[1], p.z - target[2] )) ) 
     except Exception, e:
-        
         print "Service did not process request: %s"%str(e)
 
     try:
         deleteModel(model_name) # De-spawn target and bullet
-        print "deleted"
     except rospy.ServiceException, e:
         print "Service did not process request: %s"%str(e)
 
@@ -170,6 +167,9 @@ def practiceShootGazebo(target):
             t_min = t
             dist_min = dist
     
+    savetxt('trajectory.txt', trajectory)
+    pylab.plot(trajectory[:][0], trajectory[:][1])
+    pylab.show()
     return t_min, dist_min  # Return hit (or minimal distance)
 
 def practiceShootTheory(target):
@@ -194,12 +194,14 @@ def practiceShootTheory(target):
     return t_min, dist_min
     
 def createTrainingSet(n = 100):
-    
     trainSet = []
     for i in xrange(n):
         ## Decide target position
+        target = random.random(3)
         ## Decide hand position
-        hit = practiceShootGazebo()
+        x0 = random.random(3)
+        moveHandTo(x)
+        hit = practiceShootGazebo(target)
         ## Save trial
     return trainSet
 
