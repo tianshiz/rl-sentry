@@ -22,7 +22,7 @@ if __name__ == "__main__":
 		if os.path.isdir('../data/'+fn) == False:
 			f=fof.loadPose('../data/'+fn)
 			N=len(f) #number of vectors
-			for index in xrange(0,N):
+			for index in xrange(0,N,2):
 				if file_name in friendly:
 					y.append(1)
 				elif file_name in hostile:
@@ -30,14 +30,13 @@ if __name__ == "__main__":
 				else:
 					print file_name
 
-				index2=index+1
+				index2=index+2
 				#get single vector length 45	
 				vect=fof.extractPoseFeature(f[index:index2])
-				big=max(vect)
-				print big
-				small=min(vect)
-				vect[:]=[(p-small)/(big-small) for p in vect]
-
+				me=numpy.mean(vect)
+				se=numpy.std(vect)
+				vect[:]=[(p-float(me)/float(se)) for p in vect]
+				#print 'std'+str(s)
 				x.extend([vect])
 		
 	#begin svm training
@@ -67,7 +66,7 @@ if __name__ == "__main__":
 
 		f=fof.loadPose('../data/test/'+fn)
 		N=len(f) #number of vectors
-		for index in xrange(0,N):
+		for index in xrange(0,N,2):
 			if file_name in friendly:
 				yp.append(1)
 			elif file_name in hostile:
@@ -75,12 +74,14 @@ if __name__ == "__main__":
 			else:
 				print file_name
 
-			index2=index+1
+			index2=index+2
 			#get single vector length 45	
 			vect=fof.extractPoseFeature(f[index:index2])
-			big=max(vect)
-			small=min(vect)
-			vect[:]=[(p-small)/(big-small) for p in vect]
+			
+			me=numpy.mean(vect)
+			se=numpy.std(vect)
+			vect[:]=[(p-float(me)/float(se)) for p in vect]
+
 			xp.extend([vect])	
 
 	p_label, p_acc, p_val = svm_predict(yp, xp, m)
