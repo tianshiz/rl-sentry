@@ -26,28 +26,37 @@ def KalmanStep(x,p,  z_past = [], step_future = 0):
     Q = KalmanStep.Q 
     H = KalmanStep.H 
     R = KalmanStep.R 
+
     x_old=x
+
     p_old=p
     for z in z_past:
         ## Time Update
+        
+
         x_ = dot(A, x_old)
+
         p_ = dot(dot(A, p_old), A.T) + Q
     
         ## Measurement Update
         k = dot(dot(p_, H.T), linalg.inv(dot( dot(H, p_),H.T)+R) )
         p = dot(I - dot(k,H),p_)
-    
+        z=numpy.array(z)[numpy.newaxis]
+   
+   
         #z = dot(H,x_old) 
-        x = x_ + dot(k,(z-dot(H,x_)))
+        x = x_ + dot(k,(z.T-dot(H,x_)))
+        
         x_old=x
         p_old=p
     
     for t in xrange(step_future):
         ## Time Update
+        
         x = dot(A, x)
         p = dot(dot(A, p), A.T) + Q
 
-    return z,x
+    return p,x
 
 def predict(trajectory, t):
     """ Return predicted position at time t
@@ -71,6 +80,7 @@ def init():
     sample_rate = 10 
 
     KalmanStep.A = numpy.array([[1,0 ,.1, 0],[0, 1 ,0 ,.1],[0, 0 ,1 ,0],[0, 0 ,0 ,1]])
+
     KalmanStep.Q = eye(4)
     KalmanStep.H = eye(4)
     KalmanStep.R = eye(4)
@@ -90,9 +100,18 @@ if __name__ == '__main__':
         y=line[1]
         vx=line[2]
         vy=line[3]
-        z_past.extend([[x ,y ,vx, vy]])
-    x=numpy.array([z_past[0][0],z_past[0][1],z_past[0][2],z_past[0][3]]).T
+        z_past.extend([[float(x) ,float(y) ,float(vx), float(vy)]])
+    x=numpy.array([[float(z_past[0][0])],[float(z_past[0][1])],[float(z_past[0][2])],[float(z_past[0][3])]])
+    
+    z_past=numpy.array(z_past)
     p=eye(4)
-    for i in xrange(0,len(z_past)):
-        [z,x]=KalmanStep(x,p,  z_past, 1)
+    f=open('predicted_path.txt','w')
+    f.close()
+    f=open('predicted_path.txt','a')
    
+    for i in xrange(0,len(z_past)):
+        [p,x]=KalmanStep(x,p,  z_past, 1)
+
+        f.write(str(x[0][0])+','+str(x[1][0])+','+str(x[2][0])+','+str(x[3][0])+'\n')
+    f.close()
+        
