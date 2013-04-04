@@ -20,8 +20,7 @@ torso_j = 2
 l_shoulder = 3
 r_shoulder = 5
 l_hip = 7
-r_hip = 9
-
+r_hip = 9 
 
 def loadPose(pose_filename):
     """ 
@@ -127,6 +126,23 @@ def showSkeletons(frames):
     ax.view_init(0,-180)
     pyplot.show()
 
+def loadPath(pose_filename): 
+    pose_file = open(pose_filename,'r')
+    
+    x = []
+    y = [] 
+    z = []
+
+    for line in pose_file.readlines():
+      if line == "END":
+        break
+      data = array([float(v) for v in line.strip("\n").split(',')])
+      x.append(data[0])
+      y.append(data[1])
+      z.append(0)
+
+    pylab.gca().plot(x, y, z, marker='o')
+
 def addPath(frames):
     x = []
     y = []
@@ -146,9 +162,10 @@ def trackPaths(frames):
 
     for f in frames:
       addPath(f)  
- 
-    ax.set_xlim(0,3)
-    ax.set_ylim(-1,1)
+     
+    loadPath('predicted_path.txt')
+#    ax.set_xlim(0,3)
+#    ax.set_ylim(-1,1)
     ax.view_init(90,-180)
     pyplot.show()
 
@@ -170,7 +187,7 @@ def saveTrajectory(pose_filename):
         traj.write("%f,%f,%f,%f\n"%(t_p[0],t_p[1],(t_p[0]-t_p_[0])/dt,(t_p[1]-t_p_[1])/dt))
 
 def test():
-    f = loadPose('../data/sidle1.txt')
+    f = loadPose('../data/approach1.txt')
     f2 = loadPose('../data/sidle2.txt')
     f3 = loadPose('../data/sidle3.txt')
     f4 = loadPose('../data/sidle4.txt')
@@ -179,11 +196,11 @@ def test():
     #f2 = extractPoseFeature(f[:2])
     #print f2
     #print len(f2)
-    showSkeletons([f[00],f2[0],f3[0],f4[0],f5[0],f6[0]])
-    showSkeletons([f[00],f[10],f[20],f[30],f[40],f[50]])
+#    showSkeletons([f[00],f2[0],f3[0],f4[0],f5[0],f6[0]])
+#    showSkeletons([f[00],f[10],f[20],f[30],f[40],f[50]])
 #    saveTrajectory('../data/stand1.txt')
 #    trackPaths([f,f2,f3,f4,f5,f6])
-#    trackPaths([f])
+    trackPaths([f])
 
 test()
 

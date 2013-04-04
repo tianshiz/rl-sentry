@@ -13,7 +13,7 @@ import numpy
 from numpy import *
 
 
-def KalmanStep(x,p,  z_past = [], step_future = 0):
+def KalmanStep(x,p,  z= [], step_future = 0):
     """ Perform Kalman filtering
 
     x,p are the intial conditions
@@ -30,32 +30,33 @@ def KalmanStep(x,p,  z_past = [], step_future = 0):
     x_old=x
 
     p_old=p
-    for z in z_past:
+    #for z in z_past:
         ## Time Update
-        
 
-        x_ = dot(A, x_old)
 
-        p_ = dot(dot(A, p_old), A.T) + Q
+    x_ = dot(A, x_old)
+
+    p_ = dot(dot(A, p_old), A.T) + Q
     
         ## Measurement Update
-        k = dot(dot(p_, H.T), linalg.inv(dot( dot(H, p_),H.T)+R) )
-        p = dot(I - dot(k,H),p_)
-        z=numpy.array(z)[numpy.newaxis]
+    k = dot(dot(p_, H.T), linalg.inv(dot( dot(H, p_),H.T)+R) )
+    p = dot(I - dot(k,H),p_)
+    z=numpy.array(z)[numpy.newaxis]
    
-   
+        #print dot(k,(z.T-dot(H,x_)))
         #z = dot(H,x_old) 
-        x = x_ + dot(k,(z.T-dot(H,x_)))
+    x = x_ + dot(k,(z.T-dot(H,x_)))
         
-        x_old=x
-        p_old=p
+    x_old=x
+    p_old=p
     
+    '''
     for t in xrange(step_future):
         ## Time Update
         
         x = dot(A, x)
         p = dot(dot(A, p), A.T) + Q
-
+'''
     return p,x
 
 def predict(trajectory, t):
@@ -109,9 +110,9 @@ if __name__ == '__main__':
     f.close()
     f=open('predicted_path.txt','a')
    
-    for i in xrange(0,len(z_past)):
-        [p,x]=KalmanStep(x,p,  z_past, 1)
-
+    for z in z_past:
+        [p,x]=KalmanStep(x,p,  z, 1)
+        print x
         f.write(str(x[0][0])+','+str(x[1][0])+','+str(x[2][0])+','+str(x[3][0])+'\n')
     f.close()
         
