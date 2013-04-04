@@ -37,15 +37,19 @@ def KalmanStep(x,p,  z= [], step_future = 0):
     x_ = dot(A, x_old)
 
     p_ = dot(dot(A, p_old), A.T) + Q
-    
-        ## Measurement Update
-    k = dot(dot(p_, H.T), linalg.inv(dot( dot(H, p_),H.T)+R) )
-    p = dot(I - dot(k,H),p_)
-    z=numpy.array(z)[numpy.newaxis]
-   
-        #print dot(k,(z.T-dot(H,x_)))
-        #z = dot(H,x_old) 
-    x = x_ + dot(k,(z.T-dot(H,x_)))
+    if len(z)==0:
+        x=x_
+        pass
+    else:
+
+            ## Measurement Update
+        k = dot(dot(p_, H.T), linalg.inv(dot( dot(H, p_),H.T)+R) )
+        p = dot(I - dot(k,H),p_)
+        z=numpy.array(z)[numpy.newaxis]
+       
+            #print dot(k,(z.T-dot(H,x_)))
+            #z = dot(H,x_old) 
+        x = x_ + dot(k,(z.T-dot(H,x_)))
         
     x_old=x
     p_old=p
@@ -109,10 +113,15 @@ if __name__ == '__main__':
     f=open('predicted_path.txt','w')
     f.close()
     f=open('predicted_path.txt','a')
-   
+    
     for z in z_past:
         [p,x]=KalmanStep(x,p,  z, 1)
-        print x
+        #print x
         f.write(str(x[0][0])+','+str(x[1][0])+','+str(x[2][0])+','+str(x[3][0])+'\n')
+    for i in xrange(0,14):
+
+        [p,x]=KalmanStep(x,p,  [], 1)
+        f.write(str(x[0][0])+','+str(x[1][0])+','+str(x[2][0])+','+str(x[3][0])+'\n')
+
     f.close()
         
