@@ -13,7 +13,7 @@ import numpy
 from numpy import *
 
 
-def KalmanStep(x,p,  z= [], step_future = 0):
+def KalmanStep(x,p, z_past= [], step_future = 0):
     """ Perform Kalman filtering
 
     x,p are the intial conditions
@@ -21,47 +21,45 @@ def KalmanStep(x,p,  z= [], step_future = 0):
     step_future is the number of iteration in the future
     """
     I = eye(4)
-    
+
     A = KalmanStep.A
     Q = KalmanStep.Q 
     H = KalmanStep.H 
     R = KalmanStep.R 
 
     x_old=x
-
     p_old=p
     #for z in z_past:
         ## Time Update
 
-
-    x_ = dot(A, x_old)
-
-    p_ = dot(dot(A, p_old), A.T) + Q
-    if len(z)==0:
-        x=x_
-        pass
-    else:
-
+    for z in z_past:
+        print z
+        x_ = dot(A, x_old)
+        p_ = dot(dot(A, p_old), A.T) + Q
+        
+    
             ## Measurement Update
         k = dot(dot(p_, H.T), linalg.inv(dot( dot(H, p_),H.T)+R) )
         p = dot(I - dot(k,H),p_)
         z=numpy.array(z)[numpy.newaxis]
-       
+        
             #print dot(k,(z.T-dot(H,x_)))
             #z = dot(H,x_old) 
         x = x_ + dot(k,(z.T-dot(H,x_)))
         
-    x_old=x
-    p_old=p
+        x_old=x
+        p_old=p
     
-    '''
+    
     for t in xrange(step_future):
         ## Time Update
         
-        x = dot(A, x)
-        p = dot(dot(A, p), A.T) + Q
-'''
-    return p,x
+        x = dot(A, x_old)
+        p = dot(dot(A, p_old), A.T) + Q
+        
+
+
+    return x,p
 
 def predict(trajectory, t):
     """ Return predicted position at time t
@@ -86,9 +84,9 @@ def init():
 
     KalmanStep.A = numpy.array([[1,0 ,.1, 0],[0, 1 ,0 ,.1],[0, 0 ,1 ,0],[0, 0 ,0 ,1]])
 
-    KalmanStep.Q = eye(4)
+    KalmanStep.Q = eye(4) * 0.01
     KalmanStep.H = eye(4)
-    KalmanStep.R = eye(4)
+    KalmanStep.R = eye(4) * 0.01
 
 if __name__ == '__main__':
     ## Init node
@@ -110,18 +108,16 @@ if __name__ == '__main__':
     
     z_past=numpy.array(z_past)
     p=eye(4)
+   
     f=open('predicted_path.txt','w')
     f.close()
     f=open('predicted_path.txt','a')
-    
-    for z in z_past:
-        [p,x]=KalmanStep(x,p,  z, 1)
-        #print x
+    for i in xrange(0,len(z_past)):
+        z=z_past[i:(i+5)]
+        
+        x,p = KalmanStep(x,p, z, 1)
+        
         f.write(str(x[0][0])+','+str(x[1][0])+','+str(x[2][0])+','+str(x[3][0])+'\n')
-    for i in xrange(0,14):
-
-        [p,x]=KalmanStep(x,p,  [], 1)
-        f.write(str(x[0][0])+','+str(x[1][0])+','+str(x[2][0])+','+str(x[3][0])+'\n')
-
+   
     f.close()
         
