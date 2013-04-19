@@ -96,7 +96,7 @@ if __name__ == '__main__':
     ## Create publisher
     z_past=[]
     ## Run it
-    with open('approach1_path.txt','r') as f:
+    with open('../data/sidle1_path.txt','r') as f:
         read_data=f.readlines()
     for line in read_data:
         line=line[:-1] #remove /n char
