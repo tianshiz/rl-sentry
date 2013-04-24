@@ -166,9 +166,10 @@ def practiceShootGazebo(target):
         if dist < dist_min:
             t_min = t
             dist_min = dist
-    
-    savetxt('trajectory.txt', trajectory)
-    pylab.plot(trajectory[:][0], trajectory[:][1])
+
+    savetxt('trajectory.txt', [t[1] for t in trajectory ])
+    t = array([t[1] for t in trajectory ]).T
+    pylab.plot(t[0], t[1])
     pylab.show()
     return t_min, dist_min  # Return hit (or minimal distance)
 
