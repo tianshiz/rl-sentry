@@ -26,6 +26,7 @@ from pr2_controllers_msgs.msg import Pr2GripperCommandAction, Pr2GripperCommandG
 from gazebo_msgs.srv import DeleteModel, ApplyBodyWrench, GetLinkState, GetModelState
 
 import track_predictor
+from ik_goal import create_IK_goal
 
 
 SPAWN_SCRIPT   ='python /opt/ros/groovy/stacks/simulator_gazebo/gazebo/scripts/spawn_model -file nodes/bullet.urdf -urdf'
@@ -37,7 +38,7 @@ SH_CONTROLLERS = {
     'l': '/l_arm_controller/joints',
 }
 
-def create_goal(joints_p, arm_side = 'r'):
+def create_FK_goal(joints_p, arm_side = 'r'):
     """ Create a goal for a given set of joints angles
 
     joints_p is a vector of angles
@@ -62,7 +63,6 @@ def create_goal(joints_p, arm_side = 'r'):
     goal.trajectory.header.stamp = rospy.Time.now()+rospy.Duration(.5)        
     return goal
 
-
 def getHandPos(arm_side = 'r'):
     now = rospy.Time(0)  #.now()
     tf_listener.waitForTransform('/' + arm_side + '_wrist_roll_link', '/base_footprint', now, rospy.Duration(10))
@@ -75,13 +75,18 @@ def moveGrip(p = 0.08, arm_side = 'r'):
     open.command.max_effort = -1.0
     r_g_controller.send_goal(open)
 
-def moveHandTo(p, arm_side = 'r'):
+def moveHandTo(position,orientation, arm_side = 'r'):
     """ Set arm to position 
 
     either use IK or inhouse IK
     """
     x0, r0 = getHandPos(arm_side)
-    pass
+    ik_goal = create_IK_goal(position, orientation, arm_side)
+    if arm_side == 'r':
+        r_arm_ik.send_goal(ik_goal)
+    if arm_side == 'l':
+        l_arm_ik.send_goal(ik_goal)
+    
 
 ## Sharpshooter
 def bulletPhysics():
@@ -296,10 +301,11 @@ ikinematics = None
 
 projectile_m = 0.0013  # From URDF file 
 
-if __name__ == '__main__':
-    rospy.init_node('arm_movement', anonymous=True)
-    ## Init servers
-    global l_controller, r_controller, r_g_controller, tf_listener, apply_wrench_server, get_model_server
+def initROScom():
+    global l_controller, r_controller, r_g_controller, 
+    global tf_listener, 
+    global apply_wrench_server, get_model_server
+    global r_arm_ik, l_arm_ik
 
     l_controller = actionlib.SimpleActionClient('l_arm_controller/joint_trajectory_action', JointTrajectoryAction)
     l_controller.wait_for_server()
@@ -312,6 +318,18 @@ if __name__ == '__main__':
 
     apply_wrench_server = rospy.ServiceProxy('gazebo/apply_body_wrench', ApplyBodyWrench)
     get_model_server = rospy.ServiceProxy('gazebo/get_model_state', GetModelState)
+
+    r_arm_ik = actionlib.SimpleActionClient('right_arm', MoveArmAction)
+    l_arm_ik = actionlib.SimpleActionClient('left_arm', MoveArmAction)
+    r_arm_ik.wait_for_server()
+    l_arm_ik.wait_for_server()
+    
+
+
+if __name__ == '__main__':
+    rospy.init_node('arm_movement', anonymous=True)
+    ## Init servers
+    initROScom()
     #apply_wrench_server.wait_for_server()
 
     test_shoot()
