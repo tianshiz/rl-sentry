@@ -21,6 +21,10 @@ from geometry_msgs.msg import PoseStamped, Twist, Wrench, Point
 from pr2_controllers_msgs.msg import JointTrajectoryAction, JointTrajectoryGoal
 from trajectory_msgs.msg import JointTrajectoryPoint
 
+## IK module
+from arm_navigation_msgs.msg import MoveArmAction, MoveArmGoal
+
+## Grip action
 from pr2_controllers_msgs.msg import Pr2GripperCommandAction, Pr2GripperCommandGoal
 
 from gazebo_msgs.srv import DeleteModel, ApplyBodyWrench, GetLinkState, GetModelState
@@ -89,19 +93,34 @@ def moveHandTo(position,orientation, arm_side = 'r'):
     
 
 ## Sharpshooter
-def bulletPhysics():
+def getGunPos():
+    ## TODO!!!!!!!!!!!
+    p, r = getHandPos()
+    return p, hand2gun*r 
+
+
+def bulletPhysics(n=1, theta_0 = 0, phi_0 = 0):
     """ Stocastic initial speed
+
+    can generate more than one 
 
     return the initial speed, as a vector, oriented along the x axis"""
     
-    ## Simulation Parameters
-    v0 = 17.8 ## ms
-    angles = 0.017 ## rad
-    
-    theta = random.random() * 3.1416
-    phi = random.normal(scale = angles)
-    f = PyKDL.Vector(cos(phi)*v0, sin(phi)*cos(theta)*v0, sin(phi)*sin(theta)*v0)
-    return f
+    if n == 1:
+        theta = random.random() * 3.1416 + theta_0
+        phi = random.normal(scale = angles) + phi_0
+        v = PyKDL.Vector(cos(phi)*bullet_v0,
+                     sin(phi)*cos(theta)*bullet_v0,
+                     sin(phi)*sin(theta)*bullet_v0)
+    if n > 1:
+        if n == 1:
+        theta = random.random(n) * 3.1416 + theta_0
+        phi = random.normal(n,scale = angles) + phi_0
+        v = r_[cos(phi)*bullet_v0,
+               sin(phi)*cos(theta)*bullet_v0,
+               sin(phi)*sin(theta)*bullet_v0]
+
+    return v
 
 def inverseAngle(dx, v0, a = -9.8):
     """ Find shooting angle 
@@ -118,7 +137,10 @@ def inverseAngle(dx, v0, a = -9.8):
     dt = dz/(cos(theta)*v0)
     
     return phi,theta,dt
-    
+ 
+def bulletTrajectory(x0,v0, dt, a = -9.8):
+    return x0 + v0*dt + 1./2 *a *dt**2
+
 def practiceShootGazebo(target):
     """ Simulate Shooting
 
@@ -265,12 +287,25 @@ def robotShoot():
     moveGrip(0)
 
 def shootTarget(target):
-    ## Verify training works
-    ## predict trajectory of the target using track_predictor
-    ## decide where to aim
-    #get next few points in target trajectory
-    #for each of them calculate angle
-    #sample proj traj for each angle at the given time
+    ## Get next few points in target trajectory
+    ## TODO
+    traj = [(2, (3,4,1)),
+            (3, (4,4,1)),
+            (4, (5,4,1))]  ## Placeholder
+
+    ## for each of trajectory points calculate angle
+    coarse_aims = []*len(traj)
+    gun_pos, gun_rot = getGunPos() 
+    for i, (time, target_pos) in enumerate(traj):
+        dx = target_pos - gun_pos # Relative position in absolute ref frame
+        coarse_aims[i] = inverseAngle(dx, bullet_v0)
+    
+    ## sample proj traj for each angle at the given time
+    samples_n = 30
+    for i, (dt, theta, phi) in enumerate(coarse_aims):
+        v0 = bulletPhysics(samples_n, (theta,phi))
+        samples_p = bulletTrajectory(gun_pos, )
+
     #sample some man traj at that time
     #count how many close points we get
     # forward kinematics
@@ -294,12 +329,18 @@ def test():
 def test_shoot():
     print practiceShootGazebo((20,20,20))
 
+def test_various():
+    print bulletPhysics(10)
+
 ## Robot knowledge
 hand2gun = PyKDL.Rotation.EulerZYX(0.8,0,0)
 gun2hand = hand2gun.Inverse()
-ikinematics = None
 
-projectile_m = 0.0013  # From URDF file 
+bullet_m = 0.0013  # From URDF file 
+## Simulation Parameters
+bullet_v0 = 17.8 ## ms
+bullet_dangle = 0.017 ## rad
+
 
 def initROScom():
     global l_controller, r_controller, r_g_controller, 
