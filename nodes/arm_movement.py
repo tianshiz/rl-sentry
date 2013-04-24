@@ -98,6 +98,22 @@ def bulletPhysics():
     f = PyKDL.Vector(cos(phi)*v0, sin(phi)*cos(theta)*v0, sin(phi)*sin(theta)*v0)
     return f
 
+def inverseAngle(dx, v0, a = -9.8):
+    """ Find shooting angle 
+
+    dx is the distance vector (3d)
+    """
+    phi = arctan2(dx[0],dx[1])
+    dz = sqrt(dx[0]**2 + dx[1]**2)
+    dy = dx[2]
+    
+    f = lambda t: cos(t)**2 *dy - sin(t)*cos(t)*dz - a*0.5*dz**2/v0**2
+    
+    theta = optimize.brentq(f,-pi/6.,pi/3)  ## Avoid trajectory with gun going higher than 45
+    dt = dz/(cos(theta)*v0)
+    
+    return phi,theta,dt
+    
 def practiceShootGazebo(target):
     """ Simulate Shooting
 
@@ -247,6 +263,13 @@ def shootTarget(target):
     ## Verify training works
     ## predict trajectory of the target using track_predictor
     ## decide where to aim
+    #get next few points in target trajectory
+    #for each of them calculate angle
+    #sample proj traj for each angle at the given time
+    #sample some man traj at that time
+    #count how many close points we get
+    # forward kinematics
+
     goal = aimSharpshooter(target)
     ## schedule arm movement and trigger
     ## shoot
