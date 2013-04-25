@@ -3,13 +3,11 @@ import roslib
 roslib.load_manifest('ros_sentry')
 import rospy
 import tf
-import re
 import fof
 import sys
 import numpy
 sys.path.insert(0,'../libsvm-3.17/python')
 from svmutil import *
-import curses
 
 from PyKDL import *
 

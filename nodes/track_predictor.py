@@ -11,7 +11,8 @@ import os
 import sys
 import numpy
 from numpy import *
-
+from matplotlib import pyplot as plt
+from matplotlib import animation
 
 def KalmanStep(x,p, z_past= [], step_future = 0):
     """ Perform Kalman filtering
@@ -27,13 +28,13 @@ def KalmanStep(x,p, z_past= [], step_future = 0):
     H = KalmanStep.H 
     R = KalmanStep.R 
 
-    x_old=x
+    x_old=x[:,numpy.newaxis]
     p_old=p
     #for z in z_past:
         ## Time Update
 
     for z in z_past:
-        print z
+#        print z
         x_ = dot(A, x_old)
         p_ = dot(dot(A, p_old), A.T) + Q
         
@@ -41,11 +42,11 @@ def KalmanStep(x,p, z_past= [], step_future = 0):
             ## Measurement Update
         k = dot(dot(p_, H.T), linalg.inv(dot( dot(H, p_),H.T)+R) )
         p = dot(I - dot(k,H),p_)
-        z=numpy.array(z)[numpy.newaxis]
+#        z=numpy.array(z)[:,numpy.newaxis]
         
             #print dot(k,(z.T-dot(H,x_)))
             #z = dot(H,x_old) 
-        x = x_ + dot(k,(z.T-dot(H,x_)))
+        x = x_ + dot(k,(z[:,numpy.newaxis]-dot(H,x_)))
         
         x_old=x
         p_old=p
@@ -57,9 +58,11 @@ def KalmanStep(x,p, z_past= [], step_future = 0):
         x = dot(A, x_old)
         p = dot(dot(A, p_old), A.T) + Q
         
+        x_old=x
+        p_old=p
 
 
-    return x,p
+    return x[:,0],p
 
 def predict(trajectory, t):
     """ Return predicted position at time t
@@ -88,36 +91,77 @@ def init():
     KalmanStep.H = eye(4)
     KalmanStep.R = eye(4) * 0.01
 
-if __name__ == '__main__':
-    ## Init node
-    init()
-    ## Create publisher
-    z_past=[]
-    ## Run it
-    with open('../data/sidle1_path.txt','r') as f:
-        read_data=f.readlines()
-    for line in read_data:
-        line=line[:-1] #remove /n char
-        line=line.split(',') #convert to list
-        x=line[0]
-        y=line[1]
-        vx=line[2]
-        vy=line[3]
-        z_past.extend([[float(x) ,float(y) ,float(vx), float(vy)]])
-    x=numpy.array([[float(z_past[0][0])],[float(z_past[0][1])],[float(z_past[0][2])],[float(z_past[0][3])]])
+init()
+def testAnimation():
+  trajectory = zeros((10,4))
+ 
+  # First set up the figure, the axis, and the plot element we want to animate
+  fig = plt.figure()
+  ax = plt.axes(xlim=(-10, 10), ylim=(-10, 10))
+  line, = ax.plot(trajectory[0], trajectory[1], lw=2)
+  line2, = ax.plot(trajectory[0], trajectory[1],'r',lw=2)
+
+  # initialization function: plot the background of each frame
+  def init():
+    line.set_data([], [])
+    line2.set_data([], [])
+    return line,line2,
+
+
+  # animation function.  This is called sequentially
+  def animate(i):
+    dx = random.random(2)-0.2
     
-    z_past=numpy.array(z_past)
-    p=eye(4)
-   
-    f=open('predicted_path.txt','w')
-    f.close()
-    f=open('predicted_path.txt','a')
-    for i in xrange(0,len(z_past)):
-        z=z_past[i:(i+5)]
-        
-        x,p = KalmanStep(x,p, z, 1)
-        
-        f.write(str(x[0][0])+','+str(x[1][0])+','+str(x[2][0])+','+str(x[3][0])+'\n')
-   
-    f.close()
-        
+    trajectory[:-1,:] = trajectory[1:,:]
+    trajectory[-1,0:2] = trajectory[-2,0:2] + dx
+    trajectory[-1,2:] = dx
+    
+
+    x1,p = KalmanStep(trajectory[-1], eye(4), trajectory, 1)
+    x2,p = KalmanStep(trajectory[-1], eye(4), trajectory, 5)
+    x3,p = KalmanStep(trajectory[-1], eye(4), trajectory, 10)
+    x = c_[x1, x2, x3].T
+    print x
+    line.set_data(trajectory[:,0],trajectory[:,1])
+    line2.set_data(x[:,0],x[:,1])
+    return line,line2,
+
+  # call the animator.  blit=True means only re-draw the parts that have changed.
+  anim = animation.FuncAnimation(fig, animate, init_func=init, interval=800, blit=True)
+
+  plt.show()
+
+if __name__ == '__main__':
+#    ## Init node
+#    init()
+#    ## Create publisher
+#    z_past=[]
+#    ## Run it
+#    with open('../data/sidle1_path.txt','r') as f:
+#        read_data=f.readlines()
+#    for line in read_data:
+#        line=line[:-1] #remove /n char
+#        line=line.split(',') #convert toist
+#        x=line[0]
+#        y=line[1]
+#        vx=line[2]
+#        vy=line[3]
+#        z_past.extend([[float(x) ,float(y) ,float(vx), float(vy)]])
+#    x=numpy.array([[float(z_past[0][0])],[float(z_past[0][1])],[float(z_past[0][2])],[float(z_past[0][3])]])
+#    
+#    z_past=numpy.array(z_past)
+#    p=eye(4)
+#   
+#    f=open('predicted_path.txt','w')
+#    f.close()
+#    f=open('predicted_path.txt','a')
+#    for i in xrange(0,len(z_past)):
+#        z=z_past[i:(i+5)]
+#        
+#        x,p = KalmanStep(x,p, z, 1)
+#        
+#        f.write(str(x[0][0])+','+str(x[1][0])+','+str(x[2][0])+','+str(x[3][0])+'\n')
+#   
+#    f.close()
+#
+  testAnimation()        
