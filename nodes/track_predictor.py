@@ -89,7 +89,7 @@ def init():
 
     KalmanStep.Q = eye(4) * 0.01
     KalmanStep.H = eye(4)
-    KalmanStep.R = eye(4) * 0.01
+    KalmanStep.R = diag((0.1,0.1,.9,.9)) 
 
 init()
 def testAnimation():
@@ -117,17 +117,20 @@ def testAnimation():
     trajectory[-1,2:] = dx
     
 
-    x1,p = KalmanStep(trajectory[-1], eye(4), trajectory, 1)
-    x2,p = KalmanStep(trajectory[-1], eye(4), trajectory, 5)
-    x3,p = KalmanStep(trajectory[-1], eye(4), trajectory, 10)
-    x = c_[x1, x2, x3].T
-    print x
+    # KEEP
+    x = []
+    for i in xrange(4,0,-1):
+        x.append(KalmanStep(trajectory[-1], eye(4), trajectory[:-i])[0])
+    for i in xrange(0,10):
+        x.append(KalmanStep(trajectory[-1], eye(4), trajectory, i)[0])
+    x=array(x)
+#    print x
     line.set_data(trajectory[:,0],trajectory[:,1])
     line2.set_data(x[:,0],x[:,1])
     return line,line2,
 
   # call the animator.  blit=True means only re-draw the parts that have changed.
-  anim = animation.FuncAnimation(fig, animate, init_func=init, interval=800, blit=True)
+  anim = animation.FuncAnimation(fig, animate, init_func=init, interval=500, blit=True)
 
   plt.show()
 
