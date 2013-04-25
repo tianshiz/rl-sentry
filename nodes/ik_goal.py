@@ -38,7 +38,7 @@ def poseConstraintToPositionOrientationConstraints(pose_constraint):
     return (position_constraint, orientation_constraint)
 
 def addGoalConstraintToMoveArmGoal(pose_constraint, move_arm_goal):
-    position_constraint, orientation_constraint = poseConstraintToPositionOrientationConstraints(pose_constraint);
+    position_constraint, orientation_constraint = poseConstraintToPositionOrientationConstraints(pose_constraint)
     move_arm_goal.motion_plan_request.goal_constraints.position_constraints.append(position_constraint)
     move_arm_goal.motion_plan_request.goal_constraints.orientation_constraints.append(orientation_constraint)
 
@@ -68,7 +68,7 @@ def createHandPose(pos, orientation, hand = 'r'):
 
     return desired_pose
 
-def createIKGoal(pos, orientation, hand);
+def createIKGoal(pos, orientation, hand):
     """ Create the message for the IK service 
     """
 

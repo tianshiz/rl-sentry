@@ -30,7 +30,7 @@ from pr2_controllers_msgs.msg import Pr2GripperCommandAction, Pr2GripperCommandG
 from gazebo_msgs.srv import DeleteModel, ApplyBodyWrench, GetLinkState, GetModelState
 
 import track_predictor
-from ik_goal import create_IK_goal
+from ik_goal import createIKGoal
 
 
 SPAWN_SCRIPT   ='python /opt/ros/groovy/stacks/simulator_gazebo/gazebo/scripts/spawn_model -file nodes/bullet.urdf -urdf'
@@ -42,7 +42,7 @@ SH_CONTROLLERS = {
     'l': '/l_arm_controller/joints',
 }
 
-def create_FK_goal(joints_p, arm_side = 'r'):
+def createFKGoal(joints_p, arm_side = 'r'):
     """ Create a goal for a given set of joints angles
 
     joints_p is a vector of angles
@@ -99,27 +99,28 @@ def getGunPos():
     return p, hand2gun*r 
 
 
-def bulletPhysics(n=1, theta_0 = 0, phi_0 = 0):
+def bulletPhysics(n=1, r0= PyKDL.Rotation.Identity()):
     """ Stocastic initial speed
 
     can generate more than one 
 
     return the initial speed, as a vector, oriented along the x axis"""
     
+    theta = random.random(n) * 3.1416
+    phi = random.normal(size = n, scale = bullet_d_angle)
+    v = c_[cos(phi)*bullet_v0,
+         sin(phi)*cos(theta)*bullet_v0,
+         sin(phi)*sin(theta)*bullet_v0]
+    
     if n == 1:
-        theta = random.random() * 3.1416 + theta_0
-        phi = random.normal(scale = angles) + phi_0
-        v = PyKDL.Vector(cos(phi)*bullet_v0,
-                     sin(phi)*cos(theta)*bullet_v0,
-                     sin(phi)*sin(theta)*bullet_v0)
+        v = r0 * PyKDL.Vector(v[0],v[1],v[2])
     if n > 1:
-        if n == 1:
-        theta = random.random(n) * 3.1416 + theta_0
-        phi = random.normal(n,scale = angles) + phi_0
-        v = r_[cos(phi)*bullet_v0,
-               sin(phi)*cos(theta)*bullet_v0,
-               sin(phi)*sin(theta)*bullet_v0]
-
+        r0 = array( [[r0[0,0], r0[0,1], r0[0,2]],
+                     [r0[1,0], r0[1,1], r0[1,2]],
+                     [r0[2,0], r0[2,1], r0[2,2]]])
+        #v = r_[v[0],v[1],v[2]]
+        for i in xrange(n):
+            v[i] = dot(r0,v[i])      
     return v
 
 def inverseAngle(dx, v0, a = -9.8):
@@ -138,7 +139,7 @@ def inverseAngle(dx, v0, a = -9.8):
     
     return phi,theta,dt
  
-def bulletTrajectory(x0,v0, dt, a = -9.8):
+def bulletTrajectory(x0,v0, dt, a = -9.8*r_[0,0,1]):
     return x0 + v0*dt + 1./2 *a *dt**2
 
 def practiceShootGazebo(target):
@@ -302,9 +303,10 @@ def shootTarget(target):
     
     ## sample proj traj for each angle at the given time
     samples_n = 30
-    for i, (dt, theta, phi) in enumerate(coarse_aims):
-        v0 = bulletPhysics(samples_n, (theta,phi))
-        samples_p = bulletTrajectory(gun_pos, )
+    for i, (phi, theta, dt) in enumerate(coarse_aims):
+        r0 = PyKDL.Rotation.RPY(0,theta,phi)
+        v0 = bulletPhysics(samples_n, r0)
+        samples_p = bulletTrajectory(gun_pos, v0)
 
     #sample some man traj at that time
     #count how many close points we get
@@ -332,19 +334,30 @@ def test_shoot():
 def test_various():
     print bulletPhysics(10)
 
+def test_IK():
+    p0,r0 = getHandPos(arm_side = 'r')
+    p1 = (.4,.4,.4)
+    r1 = PyKDL.Rotation.RPY(0,0.4,0.4)
+
+    moveHandTo(position= p1, orientation = rot.GetQuaternion(), arm_side = 'r' )
+    moveHandTo(position= p0, orientation = r0, arm_side = 'r' )
+
+def test_shoot()
+    robotShoot()
+
 ## Robot knowledge
-hand2gun = PyKDL.Rotation.EulerZYX(0.8,0,0)
+hand2gun = PyKDL.Rotation.RPY(0,0.3,pi/2)
 gun2hand = hand2gun.Inverse()
 
 bullet_m = 0.0013  # From URDF file 
 ## Simulation Parameters
 bullet_v0 = 17.8 ## ms
-bullet_dangle = 0.017 ## rad
+bullet_d_angle = 0.017 ## rad
 
 
 def initROScom():
-    global l_controller, r_controller, r_g_controller, 
-    global tf_listener, 
+    global l_controller, r_controller, r_g_controller
+    global tf_listener
     global apply_wrench_server, get_model_server
     global r_arm_ik, l_arm_ik
 
@@ -370,7 +383,6 @@ def initROScom():
 if __name__ == '__main__':
     rospy.init_node('arm_movement', anonymous=True)
     ## Init servers
-    initROScom()
+    #initROScom()
     #apply_wrench_server.wait_for_server()
-
-    test_shoot()
+    test_various()
