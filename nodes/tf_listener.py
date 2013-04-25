@@ -31,7 +31,7 @@ def save_frame(behav, frame, win, listener, tail):
   # iterate over joints to find their position and orientation in current frame
   i = 1
   for j in JOINTS:
-    (position,quaternion) = listener.lookupTransform("/"+j+"_1", "/openni_depth_frame", now)
+    (position,quaternion) = listener.lookupTransform("/openni_depth_frame", "/"+j+"_1", now)
     x,y,z = position
     Qx,Qy,Qz,Qw = quaternion
     f = Frame(Rotation.Quaternion(Qx,Qy,Qz,Qw),Vector(x,y,z))    
