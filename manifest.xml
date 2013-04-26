@@ -14,10 +14,9 @@
   <depend package="kinematics_msgs"/>
   <depend package="pr2_controllers_msgs"/>
   <depend package="kdl"/>
+  <depend package="arm_navigation_msgs"/>
+  <depend package="geometric_shapes"/>
   <depend package="python_orocos_kdl"/>
-  <depend package="openni_camera"/>
-  <depend package="openni_tracker"/>
-  <depend package="kdl"/>
 
 </package>
 

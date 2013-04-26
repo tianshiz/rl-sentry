@@ -34,10 +34,9 @@ import rospy
 import actionlib
 
 from arm_navigation_msgs.msg import MoveArmGoal
-from arm_navigation_.msg import MoveArmAction
-from motion_planning_msgs.msg import PositionConstraint
-from motion_planning_msgs.msg import OrientationConstraint
-from geometric_shapes_msgs.msg import Shape
+from arm_navigation_msgs.msg import MoveArmAction
+from arm_navigation_msgs.msg import PositionConstraint
+from arm_navigation_msgs.msg import OrientationConstraint
 from actionlib_msgs.msg import GoalStatus
 
 
@@ -63,33 +62,34 @@ if __name__ == '__main__':
     using a geometric_shapes/Shape message. In this case we are trying to move the end-effector 
     link (r_wrist_roll_link) to the position (0.75,-0.188,0) in the torso_lift_link frame. 
     Note also that we fill the header with the current time (ros::Time::now()).
-
+    '''
     pc = PositionConstraint()
     pc.header.stamp = rospy.Time.now()
-    pc.header.frame_id = 'torso_lift_link'
+    pc.header.frame_id = 'base_footprint'
     pc.link_name = 'r_wrist_roll_link'
-    pc.position.x = 0.75
-    pc.position.y = -0.188
-    pc.position.z = 0
+    pc.position.x = .5
+    pc.position.y = .05
+    pc.position.z = .9
 
-    pc.constraint_region_shape.type = Shape.BOX
+    pc.constraint_region_shape.type = 0
     pc.constraint_region_shape.dimensions = [0.02, 0.02, 0.02]
     pc.constraint_region_orientation.w = 1.0
     
     goalA.motion_plan_request.goal_constraints.position_constraints.append(pc)
-    '''
+
 
     oc = OrientationConstraint()
     oc.header.stamp = rospy.Time.now()
-    oc.header.frame_id = 'torso_lift_link'
+    oc.header.frame_id = 'base_footprint'
     oc.link_name = 'r_wrist_roll_link'
     oc.orientation.x = 0.
     oc.orientation.y = 0.
-    oc.orientation.z = 0.
+    oc.orientation.z = -.3
+    
     oc.orientation.w = 1.
 
-    oc.absolute_roll_tolerance = 0.04
-    oc.absolute_pitch_tolerance = 0.04
+    oc.absolute_roll_tolerance = 0.01
+    oc.absolute_pitch_tolerance = 0.01
     oc.absolute_yaw_tolerance = 0.04
     oc.weight = 1.
 
