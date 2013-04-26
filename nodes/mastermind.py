@@ -81,6 +81,7 @@ def stateMachine(state):
             pub.publish(trajectory+1) #publish trajector and shoot command(1) to arm_node
             state=AIM #go back to aiming
             alerted=1
+            sleep(0.5) #pause the shooting a bit
     elif state==AIM:
         #in this state alerted is always 1
         #keep aiming at the person
