@@ -2,6 +2,9 @@
 
 Using Kalman Filter, predicts the position of a target in the future
 we dont know the current input(u), only have measurement z,
+#    except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+#      print 'Lost user'
+
 TODO Evaluate A,Q,H,R
 
 TODO A should be learn rather then set by hand
@@ -15,11 +18,16 @@ import os
 import sys
 import numpy
 import time
+import fof
 from numpy import *
 from matplotlib import pyplot as plt
+import mpl_toolkits.mplot3d.axes3d as p3
 from matplotlib import animation
 
 global past,dt
+
+# array of joints to iterate over
+JOINTS = ["head", "neck", "torso", "left_shoulder", "left_elbow", "right_shoulder", "right_elbow", "left_hip", "left_knee", "right_hip", "right_knee", "left_hand", "right_hand", "left_foot", "right_foot"]
 
 def KalmanStep(x,p, z_past= [], step_future = 0):
     """ Perform Kalman filtering
@@ -145,6 +153,47 @@ def testAnimation(fname):
 
   plt.show()
 
+def test3D(fname):
+  frames = fof.loadPose(fname)
+  poses=[]  
+  pose = zeros((26,3))
+
+  for f in frames:
+    p=[]
+    for i in [0,1,2,3,4,11,4,3,1,5,6,12,6,5,2,7,8,13,8,7,2,9,7,9,10,14]: 
+      p.extend([[f[i][1][0], f[i][1][1], f[i][1][2]]])
+    poses.extend([array(p)])
+  
+  # Attaching 3D axis to the figure
+  fig = plt.figure()
+  ax = p3.Axes3D(fig)
+  line, = ax.plot(pose[:,0], pose[:,1], pose[:,2], lw=2)
+
+  # initialization function: plot the background of each frame
+  def init():
+    line.set_data([], [])
+    line.set_3d_properties([])
+    return line,
+
+  def animate(i):
+    pose = poses[0]
+    line.set_data(pose[:,0],pose[:,1])
+    line.set_3d_properties(pose[:,2])
+    poses.append(poses.pop(0))  
+    
+    return line,
+ 
+  # Setting the axes properties
+  ax.set_xlim3d([0, 4.0]) 
+  ax.set_ylim3d([-2.0, 2.0])
+  ax.set_zlim3d([-1.0, 1.0])
+  ax.view_init(0,-180)
+  
+  # Creating the Animation object
+  anim = animation.FuncAnimation(fig, animate, init_func=init, interval=100, blit=True)
+  
+  plt.show()
+
 def getXY():
   global past, dt
   now = rospy.Time(0)
@@ -154,6 +203,19 @@ def getXY():
   (position,quaternion) = listener.lookupTransform("/openni_depth_frame", "/torso_1", now)
   x,y,z = position
   return (x,y)
+
+def getPose():
+  jpos = []
+  now = rospy.Time(0)
+  for j in JOINTS:
+    (position,quaternion) = listener.lookupTransform("/openni_depth_frame", "/"+j+"_1", now)
+    x,y,z = position
+    jpos.extend([[x, y, z]])
+  p = []
+  for i in [0,1,2,3,4,11,4,3,1,5,6,12,6,5,2,7,8,13,8,7,2,9,7,9,10,14]: 
+    p.extend([[jpos[i][0], jpos[i][1], jpos[i][2]]])
+
+  return array(p)
 
 def trackPath():
   trajectory = zeros((10,4))
@@ -220,23 +282,55 @@ def trackPath():
 
   plt.show()
 
+def trackSkeleton():
+  pose = zeros((26,3))
+
+  # Attaching 3D axis to the figure
+  fig = plt.figure()
+  ax = p3.Axes3D(fig)
+  line, = ax.plot(pose[:,0], pose[:,1], pose[:,2], lw=2)
+
+  # initialization function: plot the background of each frame
+  def init():
+    line.set_data([], [])
+    line.set_3d_properties([])
+    return line,
+
+  def animate(i):
+    try:
+      now = rospy.Time.now()
+      listener.waitForTransform("/torso_1", "/openni_depth_frame", now, rospy.Duration(4.0))
+      pose = getPose()
+    except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+      print 'Lost User'
+    line.set_data(pose[:,0],pose[:,1])
+    line.set_3d_properties(pose[:,2])
+
+    return line,
+ 
+  # Setting the axes properties
+  ax.set_xlim3d([0, 4.0]) 
+  ax.set_ylim3d([-2.0, 2.0])
+  ax.set_zlim3d([-1.0, 1.0])
+  ax.view_init(0,-180)
+  
+  # Creating the Animation object
+  anim = animation.FuncAnimation(fig, animate, init_func=init, interval=100, blit=True)
+  
+  plt.show()
+
 if __name__ == '__main__':
   # Init node
   init()
 #  testAnimation('approach1_path.txt')    
-  rospy.init_node('tf_listener')
-  listener = tf.TransformListener()
+  test3D('../data/approach1.txt')
+#  rospy.init_node('tf_listener')
+#  listener = tf.TransformListener()
 #  rate = rospy.Rate(10.0)
-  try:
-    listener.waitForTransform("/torso_1", "/openni_depth_frame", rospy.Time(), rospy.Duration(4.0))
-    print 'Detected user, begin tracking'
-  except (tf.Exception):
-    print 'Unable to detect user'
-#  while not rospy.is_shutdown():
-#    try:
-#      now = rospy.Time.now()
-#      listener.waitForTransform("/torso_1", "/openni_depth_frame", now, rospy.Duration(4.0))
-  trackPath()
-#    except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-#      print 'Lost user'
-
+#  try:
+#    listener.waitForTransform("/torso_1", "/openni_depth_frame", rospy.Time(), rospy.Duration(4.0))
+#    print 'Detected user, begin tracking'
+#  except (tf.Exception):
+#    print 'Unable to detect user'
+#  trackPath()
+#  trackSkeleton()
