@@ -187,20 +187,20 @@ def saveTrajectory(pose_filename):
         traj.write("%f,%f,%f,%f\n"%(t_p[0],t_p[1],(t_p[0]-t_p_[0])/dt,(t_p[1]-t_p_[1])/dt))
 
 def test():
-    f = loadPose('../data/approach1.txt')
+    f = loadPose('hostile_1.txt')
     f2 = loadPose('../data/approach2.txt')
     f3 = loadPose('../data/approach3.txt')
     f4 = loadPose('../data/approach4.txt')
     f5 = loadPose('../data/approach5.txt')
-    f6 = loadPose('../data/approach6.txt')
+#    f6 = loadPose('../data/approach6.txt')
     #f2 = extractPoseFeature(f[:2])
     #print f2
     #print len(f2)
 #    showSkeletons([f[00],f2[0],f3[0],f4[0],f5[0],f6[0]])
-    showSkeletons([f[00],f[10],f[20],f[30],f[40],f[50]])
+    showSkeletons([f[80], f[70], f[90]])
 #    saveTrajectory('../data/stand1.txt')
-#    trackPaths([f,f2,f3,f4,f5,f6])
+#    trackPaths([f,f2,f3,f4,f5])
 #    trackPaths([f])
 
-#test()
+test()
 
