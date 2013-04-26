@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-import roslib; 	roslib.load_manifest('drive_base_tutorial')
+import roslib; 	
+roslib.load_manifest('rl-sentry')
 import rospy
 import actionlib
 
@@ -38,7 +39,7 @@ def poseConstraintToPositionOrientationConstraints(pose_constraint):
     return (position_constraint, orientation_constraint)
 
 def addGoalConstraintToMoveArmGoal(pose_constraint, move_arm_goal):
-    position_constraint, orientation_constraint = poseConstraintToPositionOrientationConstraints(pose_constraint);
+    position_constraint, orientation_constraint = poseConstraintToPositionOrientationConstraints(pose_constraint)
     move_arm_goal.motion_plan_request.goal_constraints.position_constraints.append(position_constraint)
     move_arm_goal.motion_plan_request.goal_constraints.orientation_constraints.append(orientation_constraint)
 
@@ -68,7 +69,7 @@ def createHandPose(pos, orientation, hand = 'r'):
 
     return desired_pose
 
-def createIKGoal(pos, orientation, hand);
+def createIKGoal(pos, orientation, hand):
     """ Create the message for the IK service 
     """
 
@@ -80,7 +81,7 @@ def createIKGoal(pos, orientation, hand);
     goalA.motion_plan_request.allowed_planning_time = rospy.Duration.from_sec(5.0);
 
     ## Set desired pose  
-    desired_pose(pos, orientation, hand)
+    desired_pose = createHandPose(pos, orientation, hand)
     ## Associate pose to goal
     addGoalConstraintToMoveArmGoal(desired_pose, goalA)
     return goalA
@@ -91,5 +92,6 @@ if __name__ == '__main__':
     ## Start Movement Client
     move_arm = actionlib.SimpleActionClient('right_arm', MoveArmAction)
     move_arm.wait_for_server()
+    goalA = createIKGoal((0.7,0,0), (0,0,0,1), 'r')
     move_arm.send_goal(goalA)
 
