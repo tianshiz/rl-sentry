@@ -3,7 +3,6 @@
 
 sentrybot
 """
-
 import roslib; roslib.load_manifest('rl-sentry')
 import rospy
 from std_msgs.msg import String
@@ -93,6 +92,14 @@ def stateMachine(state):
 
     return state
 
+def init():
+  # initialize tf_listener
+  rospy.init_node('tf_listener')
+  listener = tf.TransformListener()
+  rate = rospy.Rate(10.0)	
+
+  # load classification model
+  m = svm_load_model('heart_scale.model')
 
 if __name__ == '__main__':
     global fof 

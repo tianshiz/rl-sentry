@@ -19,19 +19,23 @@ joint_n = (11,4)
 # array of states robot can be in
 STATES = ["Neutral", "Friendly", "Hostile", "HOSTILE"]
 
-#-------------------------------------------------------------
-# Classify an individual frame as either friendly or hostile
-# output confidence values 
-#-------------------------------------------------------------
-# params:
-#   listener - used to find joint positions and orientations
-#   m        - model used to classify frames
-#-------------------------------------------------------------
-# returns:
-#   p_val    - confidence value of classification 
-#-------------------------------------------------------------
+
 def classify_frame(f,m):
-  #f=frames
+  """ Classify frame
+      ==============  
+ Classify an individual frame as either friendly or hostile
+  output confidence values 
+ 
+ params:
+   :f: used to find joint positions and orientations
+   :m: model used to classify frames
+ 
+ returns:
+   :p_val: confidence value of classification 
+ 
+  """
+
+  #f=frame
   #m is svm model
 
   #this can probably be moved else where
