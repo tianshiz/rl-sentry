@@ -2,17 +2,32 @@
 
 Using Kalman Filter, predicts the position of a target in the future
 we dont know the current input(u), only have measurement z,
+#    except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+#      print 'Lost user'
+
 TODO Evaluate A,Q,H,R
 
 TODO A should be learn rather then set by hand
 TODO Does state need momentum (probably yes NdAF)?
 """
+import roslib
+roslib.load_manifest('ros_sentry')
+import rospy
+import tf
 import os
 import sys
 import numpy
+import time
+import fof
 from numpy import *
 from matplotlib import pyplot as plt
+import mpl_toolkits.mplot3d.axes3d as p3
 from matplotlib import animation
+
+global past,dt
+
+# array of joints to iterate over
+JOINTS = ["head", "neck", "torso", "left_shoulder", "left_elbow", "right_shoulder", "right_elbow", "left_hip", "left_knee", "right_hip", "right_knee", "left_hand", "right_hand", "left_foot", "right_foot"]
 
 def KalmanStep(x,p, z_past= [], step_future = 0):
     """ Perform Kalman filtering
@@ -91,13 +106,20 @@ def init():
     KalmanStep.H = eye(4)
     KalmanStep.R = diag((0.1,0.1,.9,.9)) 
 
-init()
-def testAnimation():
+def testAnimation(fname):
   trajectory = zeros((10,4))
- 
+  z_past=[]
+  # Run it
+  with open(fname,'r') as f:
+    read_data=f.readlines()
+    for line in read_data:
+      line=line[:-1] #remove /n char
+      line=line.split(',') #convert toist
+      z_past.extend([[float(line[0]) ,float(line[1]) ,float(line[2]), float(line[3])]])
+  
   # First set up the figure, the axis, and the plot element we want to animate
   fig = plt.figure()
-  ax = plt.axes(xlim=(-10, 10), ylim=(-10, 10))
+  ax = plt.axes(xlim=(-4, 4), ylim=(-3, 3))
   line, = ax.plot(trajectory[0], trajectory[1], lw=2)
   line2, = ax.plot(trajectory[0], trajectory[1],'r',lw=2)
 
@@ -107,16 +129,13 @@ def testAnimation():
     line2.set_data([], [])
     return line,line2,
 
-
   # animation function.  This is called sequentially
   def animate(i):
-    dx = random.random(2)-0.2
-    
+#    trajectory = z_past[i:i+10] 
     trajectory[:-1,:] = trajectory[1:,:]
-    trajectory[-1,0:2] = trajectory[-2,0:2] + dx
-    trajectory[-1,2:] = dx
-    
-
+    trajectory[-1,0:2] = z_past[0][0:2]
+    trajectory[-1,2:] = z_past[0][2:]
+    z_past.append(z_past.pop(0))
     # KEEP
     x = []
     for i in xrange(4,0,-1):
@@ -124,47 +143,194 @@ def testAnimation():
     for i in xrange(0,10):
         x.append(KalmanStep(trajectory[-1], eye(4), trajectory, i)[0])
     x=array(x)
-#    print x
+
     line.set_data(trajectory[:,0],trajectory[:,1])
     line2.set_data(x[:,0],x[:,1])
     return line,line2,
 
   # call the animator.  blit=True means only re-draw the parts that have changed.
-  anim = animation.FuncAnimation(fig, animate, init_func=init, interval=500, blit=True)
+  anim = animation.FuncAnimation(fig, animate, init_func=init, interval=100, blit=True)
 
   plt.show()
 
+def test3D(fname):
+  frames = fof.loadPose(fname)
+  poses=[]  
+  pose = zeros((26,3))
+
+  for f in frames:
+    p=[]
+    for i in [0,1,2,3,4,11,4,3,1,5,6,12,6,5,2,7,8,13,8,7,2,9,7,9,10,14]: 
+      p.extend([[f[i][1][0], f[i][1][1], f[i][1][2]]])
+    poses.extend([array(p)])
+  
+  # Attaching 3D axis to the figure
+  fig = plt.figure()
+  ax = p3.Axes3D(fig)
+  line, = ax.plot(pose[:,0], pose[:,1], pose[:,2], lw=2)
+
+  # initialization function: plot the background of each frame
+  def init():
+    line.set_data([], [])
+    line.set_3d_properties([])
+    return line,
+
+  def animate(i):
+    pose = poses[0]
+    line.set_data(pose[:,0],pose[:,1])
+    line.set_3d_properties(pose[:,2])
+    poses.append(poses.pop(0))  
+    
+    return line,
+ 
+  # Setting the axes properties
+  ax.set_xlim3d([0, 4.0]) 
+  ax.set_ylim3d([-2.0, 2.0])
+  ax.set_zlim3d([-1.0, 1.0])
+  ax.view_init(0,-180)
+  
+  # Creating the Animation object
+  anim = animation.FuncAnimation(fig, animate, init_func=init, interval=100, blit=True)
+  
+  plt.show()
+
+def getXY():
+  global past, dt
+  now = rospy.Time(0)
+  ctime = time.time()
+  dt = ctime - past
+  past = ctime
+  (position,quaternion) = listener.lookupTransform("/openni_depth_frame", "/torso_1", now)
+  x,y,z = position
+  return (x,y)
+
+def getPose():
+  jpos = []
+  now = rospy.Time(0)
+  for j in JOINTS:
+    (position,quaternion) = listener.lookupTransform("/openni_depth_frame", "/"+j+"_1", now)
+    x,y,z = position
+    jpos.extend([[x, y, z]])
+  p = []
+  for i in [0,1,2,3,4,11,4,3,1,5,6,12,6,5,2,7,8,13,8,7,2,9,7,9,10,14]: 
+    p.extend([[jpos[i][0], jpos[i][1], jpos[i][2]]])
+
+  return array(p)
+
+def trackPath():
+  trajectory = zeros((10,4))
+  
+  # First set up the figure, the axis, and the plot element we want to animate
+  fig = plt.figure()
+#  ax = plt.axes(xlim=(0, 4), ylim=(-2, 2))
+  ax = plt.axes(xlim=(-2, 2), ylim=(-4, 0))
+  line, = ax.plot(trajectory[0], trajectory[1], lw=2)
+  line2, = ax.plot(trajectory[0], trajectory[1],'r',lw=2)
+
+  # initialization function: plot the background of each frame
+  def init():
+    global past, dt
+    past = 0
+    dt = 0
+    line.set_data([], [])
+    line2.set_data([], [])
+    return line,line2,
+
+  # animation function.  This is called sequentially
+  def animate(i):
+    global dt
+
+    try:
+      now = rospy.Time.now()
+      listener.waitForTransform("/torso_1", "/openni_depth_frame", now, rospy.Duration(4.0))
+      coords = getXY()
+    except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+      print 'Lost User'
+
+    trajectory[:-1,:] = trajectory[1:,:]
+    if i==1:   
+#      trajectory[-1,0] = coords[0]
+#      trajectory[-1,1] = coords[1]
+      trajectory[-1,0] = coords[1]
+      trajectory[-1,1] = -coords[0]
+      trajectory[-1,2] = 0
+      trajectory[-1,3] = 0
+    else:
+#      trajectory[-1,0] = coords[0]
+#      trajectory[-1,1] = coords[1]
+#      trajectory[-1,2] = (coords[0]-trajectory[-2,0])/dt
+#      trajectory[-1,3] = (coords[1]-trajectory[-2,1])/dt
+      trajectory[-1,0] = coords[1]
+      trajectory[-1,1] = -coords[0]
+      trajectory[-1,2] = (coords[1]-trajectory[-2,0])/dt
+      trajectory[-1,3] = (-coords[0]-trajectory[-2,1])/dt
+    
+    # KEEP
+    x = []
+    for j in xrange(4,0,-1):
+        x.append(KalmanStep(trajectory[-1], eye(4), trajectory[:-j])[0])
+    for j in xrange(0,10):
+        x.append(KalmanStep(trajectory[-1], eye(4), trajectory, j)[0])
+    x=array(x)
+
+    line.set_data(trajectory[:,0],trajectory[:,1])
+    line2.set_data(x[:,0],x[:,1])
+    return line,line2,
+
+  # call the animator.  blit=True means only re-draw the parts that have changed.
+  anim = animation.FuncAnimation(fig, animate, init_func=init, interval=100, blit=True)
+
+  plt.show()
+
+def trackSkeleton():
+  pose = zeros((26,3))
+
+  # Attaching 3D axis to the figure
+  fig = plt.figure()
+  ax = p3.Axes3D(fig)
+  line, = ax.plot(pose[:,0], pose[:,1], pose[:,2], lw=2)
+
+  # initialization function: plot the background of each frame
+  def init():
+    line.set_data([], [])
+    line.set_3d_properties([])
+    return line,
+
+  def animate(i):
+    try:
+      now = rospy.Time.now()
+      listener.waitForTransform("/torso_1", "/openni_depth_frame", now, rospy.Duration(4.0))
+      pose = getPose()
+    except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+      print 'Lost User'
+    line.set_data(pose[:,0],pose[:,1])
+    line.set_3d_properties(pose[:,2])
+
+    return line,
+ 
+  # Setting the axes properties
+  ax.set_xlim3d([0, 4.0]) 
+  ax.set_ylim3d([-2.0, 2.0])
+  ax.set_zlim3d([-1.0, 1.0])
+  ax.view_init(0,-180)
+  
+  # Creating the Animation object
+  anim = animation.FuncAnimation(fig, animate, init_func=init, interval=100, blit=True)
+  
+  plt.show()
+
 if __name__ == '__main__':
-#    ## Init node
-#    init()
-#    ## Create publisher
-#    z_past=[]
-#    ## Run it
-#    with open('../data/sidle1_path.txt','r') as f:
-#        read_data=f.readlines()
-#    for line in read_data:
-#        line=line[:-1] #remove /n char
-#        line=line.split(',') #convert toist
-#        x=line[0]
-#        y=line[1]
-#        vx=line[2]
-#        vy=line[3]
-#        z_past.extend([[float(x) ,float(y) ,float(vx), float(vy)]])
-#    x=numpy.array([[float(z_past[0][0])],[float(z_past[0][1])],[float(z_past[0][2])],[float(z_past[0][3])]])
-#    
-#    z_past=numpy.array(z_past)
-#    p=eye(4)
-#   
-#    f=open('predicted_path.txt','w')
-#    f.close()
-#    f=open('predicted_path.txt','a')
-#    for i in xrange(0,len(z_past)):
-#        z=z_past[i:(i+5)]
-#        
-#        x,p = KalmanStep(x,p, z, 1)
-#        
-#        f.write(str(x[0][0])+','+str(x[1][0])+','+str(x[2][0])+','+str(x[3][0])+'\n')
-#   
-#    f.close()
-#
-  testAnimation()        
+  # Init node
+  init()
+#  testAnimation('approach1_path.txt')    
+  test3D('../data/approach1.txt')
+#  rospy.init_node('tf_listener')
+#  listener = tf.TransformListener()
+#  rate = rospy.Rate(10.0)
+#  try:
+#    listener.waitForTransform("/torso_1", "/openni_depth_frame", rospy.Time(), rospy.Duration(4.0))
+#    print 'Detected user, begin tracking'
+#  except (tf.Exception):
+#    print 'Unable to detect user'
+#  trackPath()
+#  trackSkeleton()

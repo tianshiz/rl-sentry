@@ -192,14 +192,14 @@ def test():
     f3 = loadPose('../data/approach3.txt')
     f4 = loadPose('../data/approach4.txt')
     f5 = loadPose('../data/approach5.txt')
-    f6 = loadPose('../data/approach6.txt')
+#    f6 = loadPose('../data/approach6.txt')
     #f2 = extractPoseFeature(f[:2])
     #print f2
     #print len(f2)
 #    showSkeletons([f[00],f2[0],f3[0],f4[0],f5[0],f6[0]])
-    showSkeletons([f[00],f[10],f[20],f[30],f[40],f[50]])
+    showSkeletons([f[0], f[10], f[20]])
 #    saveTrajectory('../data/stand1.txt')
-#    trackPaths([f,f2,f3,f4,f5,f6])
+#    trackPaths([f,f2,f3,f4,f5])
 #    trackPaths([f])
 
 #test()
