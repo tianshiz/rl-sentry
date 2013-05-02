@@ -4,6 +4,7 @@ import fof
 import sys
 import os
 import numpy
+
 sys.path.insert(0, '../libsvm-3.17/python')
 from svmutil import *
 
@@ -19,6 +20,7 @@ if __name__ == "__main__":
 	for fn in os.listdir('../data/'):
 		fnum+=1
 		file_name=fn[:-5] #truncate text and number
+
 		print fn 
 		if os.path.isdir('../data/'+fn) == False:
 			f=fof.loadPose('../data/'+fn)

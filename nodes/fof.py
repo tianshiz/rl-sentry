@@ -6,9 +6,9 @@ Behaviour predictor
 
 """
 import roslib
-roslib.load_manifest('ros_sentry')
-
-from numpy import array
+roslib.load_manifest('rl-sentry')
+import sys
+from array import array
 import PyKDL
 from matplotlib import pyplot
 import pylab
@@ -45,7 +45,12 @@ def loadPose(pose_filename):
             break
         joints = [[PyKDL.Rotation(1,0,0,0,1,0,0,0,1),
                    PyKDL.Vector(0,0,0)]]*15
-        data = array([float(v) for v in line.strip("\n").split(',')])
+
+        #data = array([float(v) for v in line.strip("\n").split(',')])
+
+
+        data = array('f',[float(v) for v in line[:-3].split(',')])
+
         
         index = 1
         for j in xrange(joint_n[0]):
