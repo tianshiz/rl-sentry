@@ -7,6 +7,7 @@ import os
 
 from numpy import random
 from numpy import *
+from scipy import optimize
 
 from matplotlib import pylab
 
@@ -233,7 +234,7 @@ def bulletPhysics(n=1, r0= PyKDL.Rotation.Identity()):
     if n > 1:
         r0 = array( [[r0[0,0], r0[0,1], r0[0,2]],
                      [r0[1,0], r0[1,1], r0[1,2]],
-                     [r0[2,0], r0[2,1], r0[2,2]]])
+                     [r0[2,0], r0[2,1], r0[2,2]]]).T
         #v = r_[v[0],v[1],v[2]]
         for i in xrange(n):
             v[i] = dot(r0,v[i])      
@@ -272,7 +273,6 @@ def practiceShootGazebo(target):
     ## Gazebo Services
     deleteModel = rospy.ServiceProxy('gazebo/delete_model', DeleteModel)
     
-
     ## Set arm/hand position
 
     ## Create bullet + physics
@@ -403,45 +403,56 @@ def robotShoot():
     r_g_controller.wait_for_result()
     moveGrip(0)
 
-#import matplotlib.pylab as pl
-#from mpl_toolkits.mplot3d import Axes3D
 
-#fig = pl.figure()
-#ax = fig.add_subplot(111, projection='3d')
     
     
-def shootTarget(target):
+def shootTarget(target_trajectory, debug_plot = False):
     """ Target contains the trajectory.. """
     ## Get next few points in target trajectory
     ## TODO
-    traj = [(2, (3,4,1)),
-            (3, (4,4,1)),
-            (4, (5,4,1))]  ## Placeholder
+    target_trajectory = [(2, (3,4,1)),
+                         (3, (4,4,1)),
+                         (4, (5,4,1))]  ## Placeholder
 
     ## for each of trajectory points calculate angle
-    coarse_aims = []*len(traj)
+    coarse_aims = [0]*len(target_trajectory)
     gun_pos, gun_rot = getGunPos() 
-    for i, (time, target_pos) in enumerate(traj):
-        dx = target_pos - gun_pos # Relative position in absolute ref frame
+    for i, (time, target_pos) in enumerate(target_trajectory):
+        dx = array(target_pos) - array(gun_pos) # Relative position in absolute ref frame
         coarse_aims[i] = inverseAngle(dx, bullet_v0)
     
     ## sample proj traj for each angle at the given time
     samples_n = 30
+    samples_p = []
     for i, (phi, theta, dt) in enumerate(coarse_aims):
-        r0 = PyKDL.Rotation.RPY(0,theta,phi)
+        r0 = PyKDL.Rotation.RPY(0, theta, -phi)
         v0 = bulletPhysics(samples_n, r0)
-        samples_p = bulletTrajectory(gun_pos, v0)
+        samples_p.append(bulletTrajectory(gun_pos, v0, dt))
         
-        ax.scatter(samples_p[0],samples_p[1],samples_p[2], 'b')
-        
+        #ax.scatter(samples_p[0],samples_p[1],samples_p[2], 'b')
+    
+    if debug_plot:
+        import matplotlib.pylab as pl
+        from mpl_toolkits.mplot3d import Axes3D
+
+        fig = pl.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        for t,p in target_trajectory:
+            ax.scatter(p[0],p[1],p[2], color= 'r')
+
+        for p in samples_p:
+            ax.scatter(p.T[0],p.T[1],p.T[2], 'b')
+
+        pl.show()  
+
     #sample some man traj at that time
     #count how many close points we get
-    # forward kinematics
+    #forward kinematics
 
-    for t,p in traj:
-        ax.scatter(p[0],p[1],p[2], 'r')
     
-    pl.show()
+    
+    
     goal = aimSharpshooter(target)
     ## schedule arm movement and trigger
     ## shoot
@@ -513,9 +524,8 @@ def initROScom():
 def testShootAngle():
     a1, a2 = initGunAngle()
     pylab.plot([a[0] for a in a1], unwrap([a[2] for a in a2]),'.')
-    
     pylab.plot([a[1] for a in a1], unwrap([a[1] for a in a2]),'.')
-    #pylab.plot([a[0] for a in a1], unwrap([a[2] for a in a2]),'.')
+
     pylab.show()
 
 if __name__ == '__main__':
@@ -524,11 +534,11 @@ if __name__ == '__main__':
     ## Init servers
     initROScom()
     #robotWave()
-    initGunAngle()
-    r0 = getHandPos('r')[1]
-    moveHandTo((0,0,0), r0 * PyKDL.Rotation.RPY(0,-0.4,0))
-    print getHandPos('r')[1].GetRPY()
-    
+    #initGunAngle()
+    #r0 = getHandPos('r')[1]
+    #moveHandTo((0,0,0), r0 * PyKDL.Rotation.RPY(0,-0.4,0))
+    #print getHandPos('r')[1].GetRPY()
+    shootTarget([], True)
     
     #r_controller.send_goal(createFKGoal([[ 0.3,.4,0,-2,pi,-pi/2,0] ], 'r'))
     #l_controller.send_goal(createFKGoal([[ 0.3,.4,0,-2,pi,-pi/2,0] ], 'l'))
