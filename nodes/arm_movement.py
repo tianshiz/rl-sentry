@@ -27,7 +27,7 @@ from arm_navigation_msgs.msg import MoveArmAction, MoveArmGoal
 
 ## Forward Kinematics
 ## roslaunch pr2_3dnav right_arm_navigation.launch
-from kinematics_msgs.msg import GetKinematicSolverInfo, GetPositionFK
+#from kinematics_msgs.msg import GetKinematicSolverInfo, GetPositionFK
 
 ## Grip action
 from pr2_controllers_msgs.msg import Pr2GripperCommandAction, Pr2GripperCommandGoal
@@ -67,28 +67,35 @@ def createFKGoal(joints_p, arm_side = 'r'):
         point.velocities = [0]*len(point.positions)
         goal.trajectory.points.append(point)
         #To be reached 1 second after starting along the trajectory
-        goal.trajectory.points[ind].time_from_start = rospy.Duration(1.5)*ind
+        goal.trajectory.points[ind].time_from_start = rospy.Duration(0.5)*ind
 
     goal.trajectory.header.stamp = rospy.Time.now()+rospy.Duration(.5)        
     return goal
 
 def getHandPos(arm_side = 'r'):
-    """ Return current position of the gripper """
+    """ Return current position of the gripper 
+
+    in respect of the robot
+    """
     now = rospy.Time(0)  #.now()
     tf_listener.waitForTransform('/' + arm_side + '_wrist_roll_link', '/base_footprint', now, rospy.Duration(10))
     (trans,rot) = tf_listener.lookupTransform('/' + arm_side + '_wrist_roll_link', '/base_footprint', now)
     return trans, PyKDL.Rotation.Quaternion(*rot)
 
 def moveGrip(p = 0.08, arm_side = 'r'):
-    """ Open/close the gripper """
+    """ Open/close the gripper 
+    """
     open = Pr2GripperCommandGoal()
     open.command.position = p
     open.command.max_effort = -1.0
     r_g_controller.send_goal(open)
 
+def gunpose(theta = 0, phi = 0):
+    return [[ 0.3,.4,0,-2,pi + phi,-pi/2 + theta,0] ]
+
 def moveHandTo(position,orientation, 
                arm_side = 'r',
-               method = 'ik'):
+               method = 'house'):
     """ Set arm to position 
 
     either use IK or inhouse IK
@@ -102,73 +109,110 @@ def moveHandTo(position,orientation,
             r_arm_ik.send_goal(ik_goal)
         if arm_side == 'l':
             l_arm_ik.send_goal(ik_goal)
-    
+    ## Rotate only
     if method == 'house':
-        
-def  getFK():
-    ros::service::waitForService("pr2_right_arm_kinematics/get_fk_solver_info");
-    ros::service::waitForService("pr2_right_arm_kinematics/get_fk");
+        ## TODO verify that gun was initialized
+        gun_orientation = hand2gun * orientation 
+        __, phi, theta = gun_orientation.GetRPY()
+        r_controller.send_goal(createFKGoal(gunpose(theta,phi), 'r'))
+        r_controller.wait_for_result()
 
-    ros::ServiceClient query_client = rh.serviceClient<kinematics_msgs::GetKinematicSolverInfo>
-        ("pr2_right_arm_kinematics/get_fk_solver_info");
-    ros::ServiceClient fk_client = rh.serviceClient
-        <kinematics_msgs::GetPositionFK>("pr2_right_arm_kinematics/get_fk");
 
-    ## define the service messages
-    GetKinematicSolverInfo::Request request
-    GetKinematicSolverInfo::Response response
-    if query_client.call(request,response):
-        for(unsigned int i=0; 
-            i< response.kinematic_solver_info.joint_names.size(); i++)
-        ROS_DEBUG("Joint: %d %s", i,
-                    response.kinematic_solver_info.joint_names[i].c_str())
+def initGunAngle():
+    """ Put robot in pose
+    rotates the arm holding the gun and collects
+    training data"""
+    #gunpose = [[ 0.3,.4,0,-2,pi,-pi/2,0] ]
+    
 
-    else
-        ROS_ERROR("Could not call query service");
-        ros::shutdown();
-        exit(1);
-    }
-    ## define the service messages
-    GetPositionFK.Request  fk_request;
-    GetPositionFK.Response fk_response;
-     fk_request.header.frame_id = "torso_lift_link";
-      fk_request.fk_link_names.resize(2);
-      fk_request.fk_link_names[0] = "r_wrist_roll_link";
-      fk_request.fk_link_names[1] = "r_elbow_flex_link";
-      fk_request.robot_state.joint_state.position.resize
-        (response.kinematic_solver_info.joint_names.size());
-      fk_request.robot_state.joint_state.name = 
-        response.kinematic_solver_info.joint_names;
-      for(unsigned int i=0; 
-          i< response.kinematic_solver_info.joint_names.size(); i++)
-      {
-        fk_request.robot_state.joint_state.position[i] = 0.5;
-      }
-      if(fk_client.call(fk_request, fk_response))
-      {
-        if(fk_response.error_code.val == fk_response.error_code.SUCCESS)
-        {
-          for(unsigned int i=0; i < fk_response.pose_stamped.size(); i ++)
-          {
-            ROS_INFO_STREAM("Link    : " << fk_response.fk_link_names[i].c_str());
-            ROS_INFO_STREAM("Position: " << 
-              fk_response.pose_stamped[i].pose.position.x << "," <<  
-              fk_response.pose_stamped[i].pose.position.y << "," << 
-              fk_response.pose_stamped[i].pose.position.z);
-            ROS_INFO("Orientation: %f %f %f %f",
-              fk_response.pose_stamped[i].pose.orientation.x,
-              fk_response.pose_stamped[i].pose.orientation.y,
-              fk_response.pose_stamped[i].pose.orientation.z,
-              fk_response.pose_stamped[i].pose.orientation.w);
-          } 
-        }
-        else
+    angle_in = []
+    angle_out = []
+    ## Create a set of joint angles/hand angle
+    for phi in linspace(-pi/2,pi/2,0):
+        for theta in linspace(0,pi/3,0):
+            r_controller.send_goal(createFKGoal(gunpose(theta,phi), 'r'))
+            r_controller.wait_for_result()
+            __, rot = getHandPos()
+            angle_in.append((phi,theta))
+            angle_out.append(rot.GetRPY())
+
+    ## Set to angle 0 and get use it as reference
+    r_controller.send_goal(createFKGoal(gunpose(0,0), 'r'))
+    r_controller.wait_for_result()
+    rospy.sleep(1)
+    pos, rot = getHandPos()
+
+    global gun2hand, hand2gun, robot2gun
+    gun2hand = rot
+    hand2gun = gun2hand.Inverse()
+    robot2gun = pos
+
+    return angle_in, angle_out
+
+# def getFK():
+#     ros::service::waitForService("pr2_right_arm_kinematics/get_fk_solver_info");
+#     ros::service::waitForService("pr2_right_arm_kinematics/get_fk");
+
+#     ros::ServiceClient query_client = rh.serviceClient<kinematics_msgs::GetKinematicSolverInfo>
+#         ("pr2_right_arm_kinematics/get_fk_solver_info");
+#     ros::ServiceClient fk_client = rh.serviceClient
+#         <kinematics_msgs::GetPositionFK>("pr2_right_arm_kinematics/get_fk");
+
+#     ## define the service messages
+#     GetKinematicSolverInfo::Request request
+#     GetKinematicSolverInfo::Response response
+#     if query_client.call(request,response):
+#         for(unsigned int i=0; 
+#             i< response.kinematic_solver_info.joint_names.size(); i++)
+#         ROS_DEBUG("Joint: %d %s", i,
+#                     response.kinematic_solver_info.joint_names[i].c_str())
+
+#     else
+#         ROS_ERROR("Could not call query service");
+#         ros::shutdown();
+#         exit(1);
+#     }
+#     ## define the service messages
+#     GetPositionFK.Request  fk_request;
+#     GetPositionFK.Response fk_response;
+#      fk_request.header.frame_id = "torso_lift_link";
+#       fk_request.fk_link_names.resize(2);
+#       fk_request.fk_link_names[0] = "r_wrist_roll_link";
+#       fk_request.fk_link_names[1] = "r_elbow_flex_link";
+#       fk_request.robot_state.joint_state.position.resize
+#         (response.kinematic_solver_info.joint_names.size());
+#       fk_request.robot_state.joint_state.name = 
+#         response.kinematic_solver_info.joint_names;
+#       for(unsigned int i=0; 
+#           i< response.kinematic_solver_info.joint_names.size(); i++)
+#       {
+#         fk_request.robot_state.joint_state.position[i] = 0.5;
+#       }
+#       if(fk_client.call(fk_request, fk_response))
+#       {
+#         if(fk_response.error_code.val == fk_response.error_code.SUCCESS)
+#         {
+#           for(unsigned int i=0; i < fk_response.pose_stamped.size(); i ++)
+#           {
+#             ROS_INFO_STREAM("Link    : " << fk_response.fk_link_names[i].c_str());
+#             ROS_INFO_STREAM("Position: " << 
+#               fk_response.pose_stamped[i].pose.position.x << "," <<  
+#               fk_response.pose_stamped[i].pose.position.y << "," << 
+#               fk_response.pose_stamped[i].pose.position.z);
+#             ROS_INFO("Orientation: %f %f %f %f",
+#               fk_response.pose_stamped[i].pose.orientation.x,
+#               fk_response.pose_stamped[i].pose.orientation.y,
+#               fk_response.pose_stamped[i].pose.orientation.z,
+#               fk_response.pose_stamped[i].pose.orientation.w);
+#           } 
+#         }
+#         else
         
 ## Sharpshooter
 def getGunPos():
     ## TODO!!!!!!!!!!!
     p, r = getHandPos()
-    return p, hand2gun*r 
+    return p, hand2gun*r
 
 
 def bulletPhysics(n=1, r0= PyKDL.Rotation.Identity()):
@@ -348,7 +392,7 @@ wave = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
 
 
 def robotWave():
-    l_controller.send_goal(create_goal(wave, 'l'))
+    l_controller.send_goal(createFKGoal(wave, 'l'))
     #l_client.send_goal(create_goal([-0.3,0.2,-0.1,-1.2,1.5,-0.3,0.5]))
 
 def robotShoot():
@@ -359,15 +403,15 @@ def robotShoot():
     r_g_controller.wait_for_result()
     moveGrip(0)
 
-import matplotlib.pylab as pl
-from mpl_toolkits.mplot3d import Axes3D
+#import matplotlib.pylab as pl
+#from mpl_toolkits.mplot3d import Axes3D
 
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
+#fig = pl.figure()
+#ax = fig.add_subplot(111, projection='3d')
     
     
 def shootTarget(target):
-""" Target contains the trajectory.. """
+    """ Target contains the trajectory.. """
     ## Get next few points in target trajectory
     ## TODO
     traj = [(2, (3,4,1)),
@@ -430,8 +474,6 @@ def test_IK():
     moveHandTo(position= p1, orientation = rot.GetQuaternion(), arm_side = 'r' )
     moveHandTo(position= p0, orientation = r0, arm_side = 'r' )
 
-def test_shoot()
-    robotShoot()
 
 ## Robot knowledge
 hand2gun = PyKDL.Rotation.RPY(0,0.3,pi/2)
@@ -463,17 +505,32 @@ def initROScom():
     apply_wrench_server = rospy.ServiceProxy('gazebo/apply_body_wrench', ApplyBodyWrench)
     get_model_server = rospy.ServiceProxy('gazebo/get_model_state', GetModelState)
 
-    r_arm_ik = actionlib.SimpleActionClient('right_arm', MoveArmAction)
-    l_arm_ik = actionlib.SimpleActionClient('left_arm', MoveArmAction)
-    r_arm_ik.wait_for_server()
-    l_arm_ik.wait_for_server()
+    # r_arm_ik = actionlib.SimpleActionClient('right_arm', MoveArmAction)
+    # l_arm_ik = actionlib.SimpleActionClient('left_arm', MoveArmAction)
+    # r_arm_ik.wait_for_server()
+    # l_arm_ik.wait_for_server()
     
-
+def testShootAngle():
+    a1, a2 = initGunAngle()
+    pylab.plot([a[0] for a in a1], unwrap([a[2] for a in a2]),'.')
+    
+    pylab.plot([a[1] for a in a1], unwrap([a[1] for a in a2]),'.')
+    #pylab.plot([a[0] for a in a1], unwrap([a[2] for a in a2]),'.')
+    pylab.show()
 
 if __name__ == '__main__':
     ## Create a node
     rospy.init_node('arm_movement', anonymous=True)
     ## Init servers
-    #initROScom()
+    initROScom()
+    #robotWave()
+    initGunAngle()
+    r0 = getHandPos('r')[1]
+    moveHandTo((0,0,0), r0 * PyKDL.Rotation.RPY(0,-0.4,0))
+    print getHandPos('r')[1].GetRPY()
+    
+    
+    #r_controller.send_goal(createFKGoal([[ 0.3,.4,0,-2,pi,-pi/2,0] ], 'r'))
+    #l_controller.send_goal(createFKGoal([[ 0.3,.4,0,-2,pi,-pi/2,0] ], 'l'))
     #apply_wrench_server.wait_for_server()
-    test_various()
+    #test_various()
