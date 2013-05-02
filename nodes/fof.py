@@ -107,7 +107,6 @@ def addSkeleton(frame):
     y = []
     z = []
     for i in [0,1,2,3,4,11,4,3,1,5,6,12,6,5,2,7,8,13,8,7,2,9,7,9,10,14]: 
-      print frame[i][1][0], frame[i][1][1], frame[i][1][2] 
       x.append(frame[i][1][0])
       y.append(frame[i][1][1])
       z.append(frame[i][1][2])
@@ -124,6 +123,7 @@ def showSkeletons(frames):
     ax.set_xlim(0,3)
     ax.set_ylim(-1,1)
     ax.view_init(0,-180)
+    pyplot.axis('off')
     pyplot.show()
 
 def loadPath(pose_filename): 
@@ -187,20 +187,22 @@ def saveTrajectory(pose_filename):
         traj.write("%f,%f,%f,%f\n"%(t_p[0],t_p[1],(t_p[0]-t_p_[0])/dt,(t_p[1]-t_p_[1])/dt))
 
 def test():
-    f = loadPose('../data/approach1.txt')
-    f2 = loadPose('../data/approach2.txt')
-    f3 = loadPose('../data/approach3.txt')
-    f4 = loadPose('../data/approach4.txt')
-    f5 = loadPose('../data/approach5.txt')
+    f = loadPose('../data/creep1.txt')
+    f2 = loadPose('../data/creep2.txt')
+    f3 = loadPose('../data/creep3.txt')
+    f4 = loadPose('../data/creep4.txt')
+    f5 = loadPose('../data/creep5.txt')
 #    f6 = loadPose('../data/approach6.txt')
     #f2 = extractPoseFeature(f[:2])
     #print f2
     #print len(f2)
-#    showSkeletons([f[00],f2[0],f3[0],f4[0],f5[0],f6[0]])
-    showSkeletons([f[0], f[10], f[20]])
+#    showSkeletons([f[5],f2[5],f3[5],f4[5],f5[5]])
+#    showSkeletons([f[0], f[10], f[15], f[20]])
+#    showSkeletons([f[15]])
 #    saveTrajectory('../data/stand1.txt')
-#    trackPaths([f,f2,f3,f4,f5])
+    trackPaths([f,f2,f3,f4,f5])
 #    trackPaths([f])
 
-#test()
+if __name__ == '__main__':
+  test()
 

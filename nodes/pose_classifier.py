@@ -18,6 +18,9 @@ joint_n = (11,4)
 # array of states robot can be in
 STATES = ["Neutral", "Friendly", "Hostile", "HOSTILE"]
 
+global user
+
+user = 1
 
 #-------------------------------------------------------------
 # grab an individual frame of joint information
@@ -29,13 +32,14 @@ STATES = ["Neutral", "Friendly", "Hostile", "HOSTILE"]
 #   frame_string - string of joint data 
 #-------------------------------------------------------------
 def grab_frame(listener):
+  global user
   frame_string = "0"
   now = rospy.Time(0)
 
   # iterate over joints to find their position and orientation in current frame
   i = 1
   for j in JOINTS:
-    (position,quaternion) = listener.lookupTransform("/openni_depth_frame", "/"+j+"_1", now)
+    (position,quaternion) = listener.lookupTransform("/openni_depth_frame", "/"+j+"_"+str(user), now)
     x,y,z = position
     Qx,Qy,Qz,Qw = quaternion
     f = Frame(Rotation.Quaternion(Qx,Qy,Qz,Qw),Vector(x,y,z))    
@@ -99,7 +103,7 @@ def classify_frame(listener,m):
 
 # MAIN METHOD
 if __name__ == '__main__':
-
+  global user
   # initialize tf_listener
   rospy.init_node('tf_listener')
   listener = tf.TransformListener()
@@ -126,7 +130,7 @@ if __name__ == '__main__':
     try: 
       print 'Current State: ', STATES[state], 'pval = ', s_pval
       now = rospy.Time.now()
-      listener.waitForTransform("/torso_1", "/openni_depth_frame", now, rospy.Duration(4.0))
+      listener.waitForTransform("/torso_"+str(user), "/openni_depth_frame", now, rospy.Duration(4.0))
       
       # constantly shift in confidence values, use their sums to determine state transitions
       pval[:-1] = pval[1:]
@@ -155,6 +159,8 @@ if __name__ == '__main__':
           state = WHOSTILE 
           pval = [0]*10
     except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-      print 'Lost user'
+      user = user + 1
+      print 'Lost user, now searching for user ' + str(user)
+      continue
     
     rate.sleep()
