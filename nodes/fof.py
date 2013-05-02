@@ -8,7 +8,8 @@ Behaviour predictor
 import roslib
 roslib.load_manifest('rl-sentry')
 import sys
-from array import array
+## NdAf  use Numpay Array, is nicer
+from array import array  
 import PyKDL
 from matplotlib import pyplot
 import pylab
