@@ -287,7 +287,15 @@ def robotShoot():
     r_g_controller.wait_for_result()
     moveGrip(0)
 
+import matplotlib.pylab as pl
+from mpl_toolkits.mplot3d import Axes3D
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+    
+    
 def shootTarget(target):
+""" Target contains the trajectory.. """
     ## Get next few points in target trajectory
     ## TODO
     traj = [(2, (3,4,1)),
@@ -307,15 +315,23 @@ def shootTarget(target):
         r0 = PyKDL.Rotation.RPY(0,theta,phi)
         v0 = bulletPhysics(samples_n, r0)
         samples_p = bulletTrajectory(gun_pos, v0)
-
+        
+        ax.scatter(samples_p[0],samples_p[1],samples_p[2], 'b')
+        
     #sample some man traj at that time
     #count how many close points we get
     # forward kinematics
 
+    for t,p in traj:
+        ax.scatter(p[0],p[1],p[2], 'r')
+    
+    pl.show()
     goal = aimSharpshooter(target)
     ## schedule arm movement and trigger
     ## shoot
 
+    
+    
 def test():
     ## Get List of Arms Joints
     print rospy.get_param('/r_gripper_controller/joint')
