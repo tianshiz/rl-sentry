@@ -9,8 +9,10 @@ import rospy
 from std_msgs.msg import String
 import actionlib
 import time
-from statemachine import StateMachine
-
+import tf
+import sys
+import poseClassify
+sys.path.insert(0,'../libsvm-3.17/python')
 #subscribe to rostopic to start/stop the master
 #mastermind node responds once receiving message from publisher
 def callback(data):
@@ -33,7 +35,7 @@ def listener():
 
 #state machine method that makes high level decisions
 def stateMachine(state):
-    global alerted,fof #state flags
+    global fof #state flags
     #state definitions
     START=0
     END=1
@@ -46,44 +48,35 @@ def stateMachine(state):
         #brief startup state to init some flags, we never come back here
         state=STANDBY #go to standby
         fof=1 #fof can be 0 for friendly, 1 for neutral, 2 for foe
-        alerted=0 #if alerted, robot will keep aiming at person
     elif state==END:
         pass
     elif state==STANDBY:
         #observation mode to identify people
         if fof>=1:
             #if not friendly, aim gun
-            if alerted==1:
-                state=AIM
-            else:
-                #not alerted yet, wave person to identify itself
-                state=WAVE
-                waveHand() #wave the robot's non gun hand
+            state=AIM    
+        else:
+            #friendly, go to wave to id
+            state=WAVE
+            waveHand()
 
     elif state==WAVE:
         #when the robot beckons you to id yourself. stand still and face the robot
-        #else u get aimed at and alerted turns on
         if fof==2:
             state=AIM
-            alerted=1
         #nothing happens as long as u remain friendly or neutral
 
     elif state==SHOOT:
-        if fof==0:
+        if fof==0:m
             #friendly
             state=STANDBY
-            alerted=0
         elif fof==1:
             #target is neutral, but do not let your guard down!
             state=AIM
-            alerted=1
         else:
-            pub.publish(trajectory+1) #publish trajector and shoot command(1) to arm_node
+            shoot(trajectory,1) #publish trajector and shoot command(1) to arm_node
             state=AIM #go back to aiming
-            alerted=1
-            sleep(0.5) #pause the shooting a bit
     elif state==AIM:
-        #in this state alerted is always 1
         #keep aiming at the person
         if fof==2:
             #shoot if foe!
@@ -91,33 +84,20 @@ def stateMachine(state):
         elif fof==0:
             #go on standby knowing the person is friendly
             state=STANDBY
-            alerted=0
         else:
-            pub.publish(trajectory+0)#publish trajector and no shoot command(0) to arm_node
-
+            shoot(trajectory,0)
 
         #otherwise we remain aiming if neutral
     else:
         raise ValueError, "unexpected state "+state
 
-
-
-
-            #
-            ## If not alerted
-                ## track humans
-                ## choose one still neutral and predict fof on him
-                ## if friend identify him
-                ## if foe get allerted
-                ## if neutral invite or idle
-            ## if alerted
-                ## shoot and verify change of behaviour
     return state
 
 
 if __name__ == '__main__':
     global fof 
-
+    #load svm model
+    m = svm_load_model('heart_scale.model')
     START=0
     END=1
     STANDBY=2
@@ -145,16 +125,20 @@ if __name__ == '__main__':
             ## Mainloop
             
             #tf-listener update periodically(once every secs) and get sequence of frames
-            curr_time=time.time()
-            if curr_time-last_time>1
-                last_time=curr_time
-                #call this getFrames function, made from parts of tf-listener
-                frames=getFrames() #most recent frame is 
+          
+            last_time=curr_time
+            #call this getFrames function, made from parts of tf-listener
+            frames=getFrames() #most recent frame is 
 
-                #with the frames, get gesture prediction(sentry states)
-                fof=pose_classifier(frames) 
+            #with the frames, get gesture prediction(sentry states)
+            #fof can be 0 for friendly, 1 for neutral, 2 for foe
+            fof=poseClassify.classify_frame(frames,m) 
+            #there are two returns for hostile, we count them the same
+            if fof==3:
+                fof==2
 
-                #with frames, get predicted trajectory, a string of points in trajector
-                trajectory=predictPath(frames)
+
+            #with frames, get predicted trajectory, a string of points in trajector
+            trajectory=predictPath(frames)
             #get next state
             state=stateMachine(state)
