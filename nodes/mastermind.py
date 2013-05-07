@@ -129,6 +129,12 @@ if __name__ == '__main__':
     posestate = NEUTRAL  
     pval = [0]*10
     s_pval = 0
+
+    try:
+        listener.waitForTransform("/torso_1", "/openni_depth_frame", rospy.Time(), rospy.Duration(4.0))
+        print 'Detected user, begin classifying'
+    except (tf.Exception):
+        print 'Unable to detect user'  
     #forever loop
     while True:
         if start==0:
@@ -140,9 +146,10 @@ if __name__ == '__main__':
             ## Mainloop
             
             #grab a frame periodically
+            listener.waitForTransform("/torso_1", "/openni_depth_frame", now, rospy.Duration(4.0))
 
             #call this getFrames function, made from parts of tf-listener
-            frame=grabFrame(listener) 
+            frame=frameExtract.grabFrame(listener) 
             #update current pose state
             posestate=poseClassify.getClass(frame,m,posestate,pval,s_pval)
 
