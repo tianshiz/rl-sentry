@@ -3,7 +3,7 @@
 
 Extracts requested information from a given frame
 """
-import roslib; roslib.load_manifest('rl-sentry')
+import roslib; roslib.load_manifest('ros-sentry')
 import rospy
 import tf
 import sys

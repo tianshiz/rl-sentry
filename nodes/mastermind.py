@@ -55,7 +55,7 @@ def stateMachine(state):
             #target is neutral, but do not let your guard down!
             state=AIM
         else:
-            shoot(trajectory,1) #publish trajector and shoot command(1) to arm_node
+           # shoot(trajectory,1) #publish trajector and shoot command(1) to arm_node
             state=AIM #go back to aiming
     elif state==AIM:
         #keep aiming at the person
@@ -66,7 +66,7 @@ def stateMachine(state):
             #go on standby knowing the person is friendly
             state=STANDBY
         else:
-            shoot(trajectory,0)
+            #shoot(trajectory,0)
 
         #otherwise we remain aiming if neutral
     else:
