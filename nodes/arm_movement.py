@@ -96,7 +96,7 @@ def moveGrip(p = 0.08, arm_side = 'r'):
     r_g_controller.send_goal(open)
 
 def gunpose(theta = 0, phi = 0):
-    return [[ 0.3,.4,0,-2,pi + phi,-pi/2 + theta,0] ]
+    return [[ -0.2, .4, 0, -2,  -phi+pi, -pi/2 + theta,0] ]
 
 def moveHandTo(position,orientation, 
                arm_side = 'r',
@@ -117,9 +117,9 @@ def moveHandTo(position,orientation,
     ## Rotate only
     if method == 'house':
         ## TODO verify that gun was initialized
-        gun_orientation = hand2gun * orientation 
+        gun_orientation = gun2hand * orientation 
         __, phi, theta = gun_orientation.GetRPY()
-        r_controller.send_goal(createFKGoal(gunpose(theta,phi), 'r'))
+        r_controller.send_goal(createFKGoal(gunpose(phi,theta), 'r'))
         r_controller.wait_for_result()
 
 
@@ -148,7 +148,7 @@ def initGunAngle():
     pos, rot = getHandPos()
 
     global gun2hand, hand2gun, robot2gun
-    gun2hand = rot
+    gun2hand = PyKDL.Rotation.RPY(0,0,0)* rot
     hand2gun = gun2hand.Inverse()
     robot2gun = pos
 
@@ -370,18 +370,6 @@ def createTrainingSet(n = 100):
         ## Save trial
     return trainSet
 
-def trainSharpshooter():
-    """ Train at sharpshooting
-
-    TODO decide learning method
-    TODO save final state on disk
-
-    """
-    ## Gather Training set
-    ## Update policy/model/decider/filter
-    ## return/init model
-    pass
-
 def aimSharpshooter(target):
     ## Return joints / handposition / posegoal to hit the target
     pass
@@ -470,34 +458,14 @@ def shootTarget(target_trajectory, debug_plot = False):
         marker = createMarkerLine( pos_list = bullet_t, color = (1., 0.1, 0.),
                                    ID = i, size = 0.02 )
         markerArray.markers.append(marker)
+    # Publish trajectory
     bullet_trajectory_topic.publish(markerArray)
 
-    # Publish trajectory
-
-
-    #rospy.sleep(0.01)
-    # if debug_plot:
-    #     import matplotlib.pylab as pl
-    #     from mpl_toolkits.mplot3d import Axes3D
-
-    #     fig = pl.figure()
-    #     ax = fig.add_subplot(111, projection='3d')
-
-    #     for t,p in target_trajectory:
-    #         ax.scatter(p[0],p[1],p[2], color= 'r')
-
-    #     for p in samples_p:
-    #         ax.scatter(p.T[0],p.T[1],p.T[2], 'b')
-
-    #     pl.show()  
-
+    
     #sample some man traj at that time
     #count how many close points we get
-    #forward kinematics
-
-    
-    
-    
+    #forward kinematics    
+    moveHandTo( (0,0,0), coarse_aims[1][0])    
     #goal = aimSharpshooter(target)
     ## schedule arm movement and trigger
     ## shoot
@@ -532,7 +500,7 @@ def test_IK():
 
 
 ## Robot knowledge
-hand2gun = PyKDL.Rotation.RPY(0,0.3,pi/2)
+hand2gun = PyKDL.Rotation.RPY(0,0,0)
 gun2hand = hand2gun.Inverse()
 
 bullet_m = 0.0013  # From URDF file 
@@ -632,8 +600,8 @@ if __name__ == '__main__':
     rospy.init_node('arm_movement', anonymous=True)
     ## Init servers
     initROScom()
-    #robotWave()
-    #initGunAngle()
+    robotWave()
+    initGunAngle()
     #r0 = getHandPos('r')[1]
     #moveHandTo((0,0,0), r0 * PyKDL.Rotation.RPY(0,-0.4,0))
     #print getHandPos('r')[1].GetRPY()
