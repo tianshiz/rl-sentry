@@ -37,22 +37,23 @@ def classify_frame(frame,m):
   vect[:]=[(p-float(me)/float(se)) for p in vect]
 #  xp.extend([vect])
   p_label, p_acc, p_val = svm_predict([0]*len(vect), vect, m, '-q')
-  
+
+  return p_val[0][0]
+
+def getClass(frames,m,state,pval,s_pval):
   # PR2 Sentry States
   NEUTRAL  = 1
   FRIENDLY = 0
   WHOSTILE = 2  
   SHOSTILE = 3
-  # Initial state is neutral  
-  state = NEUTRAL  
-  pval = [0]*10
-  s_pval = 0
-  
+
+
+
   print 'Current State: ', STATES[state], 'pval = ', s_pval
 
   # constantly shift in confidence values, use their sums to determine state transitions
   pval[:-1] = pval[1:]
-  pval[-1] =  p_val[0][0]
+  pval[-1] = classify_frame(frame,m)
   s_pval = sum(pval)
   if state == NEUTRAL:
     if s_pval > 9:

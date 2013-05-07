@@ -11,6 +11,7 @@ import time
 import tf
 import sys
 import poseClassify
+import frameExtract
 sys.path.insert(0,'../libsvm-3.17/python')
 #subscribe to rostopic to start/stop the master
 #mastermind node responds once receiving message from publisher
@@ -28,7 +29,7 @@ def callback(data):
 #listener for topic subsciber    
 def listener():
     rospy.init_node('master_node')
-    pub = rospy.Publisher('arm_node', String)
+    pub = rospy.Publisher('trajectory', String)
     rospy.Subscriber("start_master", String, callback)
     # spin() simply keeps python from exiting until this node is stopped
 
@@ -103,6 +104,9 @@ def init():
 
 if __name__ == '__main__':
     global fof 
+    # initialize tf_listener
+    rospy.init_node('tf_listener')
+    listener = tf.TransformListener()
     #load svm model
     m = svm_load_model('heart_scale.model')
     START=0
@@ -113,39 +117,47 @@ if __name__ == '__main__':
     AIM=5
 
     state=START #initial state
-
+    targetTrajectory=[]
+    trajectoryHistory=[]
     start=0
     #intialize subscriber
     listener() 
     #record current time
     last_time=time.time()
+
+      # Initial state is neutral  
+    posestate = NEUTRAL  
+    pval = [0]*10
+    s_pval = 0
     #forever loop
     while True:
         if start==0:
         #mastermind should not run
-            print 'nope!'
             state=END
         else:
         #run likenormal
-            print 'ok!'
             
             ## Mainloop
             
-            #tf-listener update periodically(once every secs) and get sequence of frames
-          
-            last_time=curr_time
-            #call this getFrames function, made from parts of tf-listener
-            frames=getFrames() #most recent frame is 
+            #grab a frame periodically
 
-            #with the frames, get gesture prediction(sentry states)
-            #fof can be 0 for friendly, 1 for neutral, 2 for foe
-            fof=poseClassify.classify_frame(frames,m) 
+            #call this getFrames function, made from parts of tf-listener
+            frame=grabFrame(listener) 
+            #update current pose state
+            posestate=poseClassify.getClass(frame,m,posestate,pval,s_pval)
+
             #there are two returns for hostile, we count them the same
-            if fof==3:
-                fof==2
+            if posestate==3 or posestate==2:
+                fof=2
+            else:
+                #update global fof variable for statemachine
+                fof=posestate
 
 
             #with frames, get predicted trajectory, a string of points in trajector
-            trajectory=predictPath(frames)
+            #trajectory=predictPath(frames)
+
+            #publish trajectory to rostopics
+
             #get next state
             state=stateMachine(state)
