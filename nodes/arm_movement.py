@@ -83,8 +83,8 @@ def getHandPos(arm_side = 'r'):
     in respect of the robot
     """
     now = rospy.Time(0)  #.now()
-    tf_listener.waitForTransform('/' + arm_side + '_wrist_roll_link', '/base_footprint', now, rospy.Duration(10))
-    (trans,rot) = tf_listener.lookupTransform('/' + arm_side + '_wrist_roll_link', '/base_footprint', now)
+    tf_listener.waitForTransform('/base_footprint','/' + arm_side + '_wrist_roll_link',  now, rospy.Duration(10))
+    (trans,rot) = tf_listener.lookupTransform('/base_footprint', '/' + arm_side + '_wrist_roll_link', now)
     return trans, PyKDL.Rotation.Quaternion(*rot)
 
 def moveGrip(p = 0.08, arm_side = 'r'):
@@ -238,7 +238,7 @@ def bulletPhysics(n=1, r0= PyKDL.Rotation.Identity()):
     if n > 1:
         r0 = array( [[r0[0,0], r0[0,1], r0[0,2]],
                      [r0[1,0], r0[1,1], r0[1,2]],
-                     [r0[2,0], r0[2,1], r0[2,2]]]).T
+                     [r0[2,0], r0[2,1], r0[2,2]]])
         #v = r_[v[0],v[1],v[2]]
         for i in xrange(n):
             v[i] = dot(r0,v[i])      
@@ -413,23 +413,24 @@ def robotShoot():
 def shootTarget(target_trajectory, debug_plot = False):
     """ Target contains the trajectory.. """
     ## Get next few points in target trajectory
-    ## TODO
-    target_trajectory = [(2, (3,0,1)),
-                         (3, (4,0,1)),
-                         (4, (5,0,1))]  ## Placeholder
+    if debug_plot:
+        target_trajectory = [(2, (3,-2,1)),
+                             (3, (4,0,1)),
+                             (4, (5,2,1))]  ## Placeholder
 
     ## for each of trajectory points calculate angle
     coarse_aims = [0]*len(target_trajectory)
-    gun_pos, gun_rot = getGunPos() 
+    gun_pos, gun_rot = getGunPos()
+    #gun_pos = [0,0,1]
     for i, (time, target_pos) in enumerate(target_trajectory):
-        dx = array(target_pos) - array(gun_pos) # Relative position in absolute ref frame
-        coarse_aims[i] = inverseAngle(dx, bullet_v0)
+        dx = array(target_pos) - array(gun_pos) # Relative position
+        phi, theta, dt = inverseAngle(dx, bullet_v0)
+        coarse_aims[i] = (PyKDL.Rotation.RPY(0,  -theta, pi/2-phi), dt)
     
     ## sample proj traj for each angle at the given time
     samples_n = 10
     samples_p = []
-    for i, (phi, theta, dt) in enumerate(coarse_aims):
-        r0 = PyKDL.Rotation.RPY(0,  theta, -pi/2+phi)
+    for i, (r0, dt) in enumerate(coarse_aims):
         v0 = bulletPhysics(samples_n, r0)
         samples_p.append( bulletTrajectory(gun_pos, v0, dt))
         
@@ -437,11 +438,10 @@ def shootTarget(target_trajectory, debug_plot = False):
     
     ## Publish target trajectory
     ## Possibly on mastermind
-
     markerArray = MarkerArray()
     for i, (time, target_pos) in enumerate(target_trajectory):
             marker = createMarker( pos = target_pos, color = (1., 0.1, 0.),
-                                     ID = i, size = 0.2 )
+                                ID = i, size = 0.12 )
             markerArray.markers.append(marker)
 
     # Publish the MarkerArray
@@ -458,9 +458,22 @@ def shootTarget(target_trajectory, debug_plot = False):
 
             # Renumber the marker IDs
             count += 1
-
     # Publish the MarkerArray
     bullets_topic.publish(markerArray)
+    
+    
+    for i, (r0, dt) in enumerate(coarse_aims):
+        v0 = r0 * PyKDL.Vector(bullet_v0,0,0)
+        v0 = r_[v0[0], v0[1], v0[2]]
+        bullet_t = [ bulletTrajectory(gun_pos, v0, t) for t in linspace(0,dt,10) ]
+
+        marker = createMarkerLine( pos_list = bullet_t, color = (1., 0.1, 0.),
+                                   ID = i, size = 0.02 )
+        markerArray.markers.append(marker)
+    bullet_trajectory_topic.publish(markerArray)
+
+    # Publish trajectory
+
 
     #rospy.sleep(0.01)
     # if debug_plot:
@@ -535,7 +548,7 @@ def initROScom():
     global tf_listener
     global apply_wrench_server, get_model_server
     global r_arm_ik, l_arm_ik
-    global trajectory_topic, bullets_topic
+    global trajectory_topic, bullets_topic, bullet_trajectory_topic
 
     l_controller = actionlib.SimpleActionClient('l_arm_controller/joint_trajectory_action', JointTrajectoryAction)
     l_controller.wait_for_server()
@@ -551,6 +564,7 @@ def initROScom():
 
     trajectory_topic = rospy.Publisher("targets", MarkerArray)
     bullets_topic = rospy.Publisher("bullets", MarkerArray)
+    bullet_trajectory_topic = rospy.Publisher("bullet_trajectory", MarkerArray)
 
     # r_arm_ik = actionlib.SimpleActionClient('right_arm', MoveArmAction)
     # l_arm_ik = actionlib.SimpleActionClient('left_arm', MoveArmAction)
@@ -587,6 +601,32 @@ def createMarker(pos, color = (.1, .1, 1), ID = 0, alpha = 1., size = 0.5):
     marker.pose.position.z = pos[2]
     return marker
 
+def createMarkerLine(pos_list, color = (.1, .1, 1), ID = 0, alpha = 1., size = 0.5):
+    marker = Marker()
+    marker.header.frame_id = "/base_footprint"
+    marker.id = ID
+    marker.type = marker.LINE_STRIP
+    marker.action = marker.ADD
+
+    marker.scale.x = size
+    marker.scale.y = size
+    marker.scale.z = size
+    marker.color.a = alpha
+
+    marker.color.r = color[0]
+    marker.color.g = color[1]
+    marker.color.b = color[2]
+    marker.pose.orientation.w = 1.0
+
+    marker.pose.position.x = 0
+    marker.pose.position.y = 0
+    marker.pose.position.z = 0
+
+    for p in pos_list:
+        marker.points.append( Point(p[0],p[1],p[2]) )
+
+    return marker
+
 if __name__ == '__main__':
     ## Create a node
     rospy.init_node('arm_movement', anonymous=True)
@@ -597,8 +637,9 @@ if __name__ == '__main__':
     #r0 = getHandPos('r')[1]
     #moveHandTo((0,0,0), r0 * PyKDL.Rotation.RPY(0,-0.4,0))
     #print getHandPos('r')[1].GetRPY()
+
     shootTarget([], True)
-     
+    rospy.signal_shutdown("End")
     #r_controller.send_goal(createFKGoal([[ 0.3,.4,0,-2,pi,-pi/2,0] ], 'r'))
     #l_controller.send_goal(createFKGoal([[ 0.3,.4,0,-2,pi,-pi/2,0] ], 'l'))
     #apply_wrench_server.wait_for_server()
