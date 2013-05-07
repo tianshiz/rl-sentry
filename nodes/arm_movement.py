@@ -33,7 +33,11 @@ from arm_navigation_msgs.msg import MoveArmAction, MoveArmGoal
 ## Grip action
 from pr2_controllers_msgs.msg import Pr2GripperCommandAction, Pr2GripperCommandGoal
 
+## Gazebo
 from gazebo_msgs.srv import DeleteModel, ApplyBodyWrench, GetLinkState, GetModelState
+
+## RViz
+from visualization_msgs.msg import Marker, MarkerArray
 
 import track_predictor
 from ik_goal import createIKGoal
@@ -226,8 +230,8 @@ def bulletPhysics(n=1, r0= PyKDL.Rotation.Identity()):
     theta = random.random(n) * 3.1416
     phi = random.normal(size = n, scale = bullet_d_angle)
     v = c_[cos(phi)*bullet_v0,
-         sin(phi)*cos(theta)*bullet_v0,
-         sin(phi)*sin(theta)*bullet_v0]
+           sin(phi)*cos(theta)*bullet_v0,
+           sin(phi)*sin(theta)*bullet_v0]
     
     if n == 1:
         v = r0 * PyKDL.Vector(v[0],v[1],v[2])
@@ -256,7 +260,7 @@ def inverseAngle(dx, v0, a = -9.8):
     
     return phi,theta,dt
  
-def bulletTrajectory(x0,v0, dt, a = -9.8*r_[0,0,1]):
+def bulletTrajectory(x0, v0, dt, a = -9.8*r_[0,0,1]):
     return x0 + v0*dt + 1./2 *a *dt**2
 
 def practiceShootGazebo(target):
@@ -410,9 +414,9 @@ def shootTarget(target_trajectory, debug_plot = False):
     """ Target contains the trajectory.. """
     ## Get next few points in target trajectory
     ## TODO
-    target_trajectory = [(2, (3,4,1)),
-                         (3, (4,4,1)),
-                         (4, (5,4,1))]  ## Placeholder
+    target_trajectory = [(2, (3,0,1)),
+                         (3, (4,0,1)),
+                         (4, (5,0,1))]  ## Placeholder
 
     ## for each of trajectory points calculate angle
     coarse_aims = [0]*len(target_trajectory)
@@ -422,29 +426,57 @@ def shootTarget(target_trajectory, debug_plot = False):
         coarse_aims[i] = inverseAngle(dx, bullet_v0)
     
     ## sample proj traj for each angle at the given time
-    samples_n = 30
+    samples_n = 10
     samples_p = []
     for i, (phi, theta, dt) in enumerate(coarse_aims):
-        r0 = PyKDL.Rotation.RPY(0, theta, -phi)
+        r0 = PyKDL.Rotation.RPY(0,  theta, -pi/2+phi)
         v0 = bulletPhysics(samples_n, r0)
-        samples_p.append(bulletTrajectory(gun_pos, v0, dt))
+        samples_p.append( bulletTrajectory(gun_pos, v0, dt))
         
         #ax.scatter(samples_p[0],samples_p[1],samples_p[2], 'b')
     
-    if debug_plot:
-        import matplotlib.pylab as pl
-        from mpl_toolkits.mplot3d import Axes3D
+    ## Publish target trajectory
+    ## Possibly on mastermind
 
-        fig = pl.figure()
-        ax = fig.add_subplot(111, projection='3d')
+    markerArray = MarkerArray()
+    for i, (time, target_pos) in enumerate(target_trajectory):
+            marker = createMarker( pos = target_pos, color = (1., 0.1, 0.),
+                                     ID = i, size = 0.2 )
+            markerArray.markers.append(marker)
 
-        for t,p in target_trajectory:
-            ax.scatter(p[0],p[1],p[2], color= 'r')
+    # Publish the MarkerArray
+    trajectory_topic.publish(markerArray)
 
-        for p in samples_p:
-            ax.scatter(p.T[0],p.T[1],p.T[2], 'b')
+    ## Publish bullets on topic
+    markerArray = MarkerArray()
+    count = 0
+    for p in samples_p:
+        for b in p:
+            marker = createMarker( pos = b, ID = count, size = 0.05)
+            marker.id = count
+            markerArray.markers.append(marker)
 
-        pl.show()  
+            # Renumber the marker IDs
+            count += 1
+
+    # Publish the MarkerArray
+    bullets_topic.publish(markerArray)
+
+    #rospy.sleep(0.01)
+    # if debug_plot:
+    #     import matplotlib.pylab as pl
+    #     from mpl_toolkits.mplot3d import Axes3D
+
+    #     fig = pl.figure()
+    #     ax = fig.add_subplot(111, projection='3d')
+
+    #     for t,p in target_trajectory:
+    #         ax.scatter(p[0],p[1],p[2], color= 'r')
+
+    #     for p in samples_p:
+    #         ax.scatter(p.T[0],p.T[1],p.T[2], 'b')
+
+    #     pl.show()  
 
     #sample some man traj at that time
     #count how many close points we get
@@ -453,7 +485,7 @@ def shootTarget(target_trajectory, debug_plot = False):
     
     
     
-    goal = aimSharpshooter(target)
+    #goal = aimSharpshooter(target)
     ## schedule arm movement and trigger
     ## shoot
 
@@ -503,6 +535,7 @@ def initROScom():
     global tf_listener
     global apply_wrench_server, get_model_server
     global r_arm_ik, l_arm_ik
+    global trajectory_topic, bullets_topic
 
     l_controller = actionlib.SimpleActionClient('l_arm_controller/joint_trajectory_action', JointTrajectoryAction)
     l_controller.wait_for_server()
@@ -516,6 +549,9 @@ def initROScom():
     apply_wrench_server = rospy.ServiceProxy('gazebo/apply_body_wrench', ApplyBodyWrench)
     get_model_server = rospy.ServiceProxy('gazebo/get_model_state', GetModelState)
 
+    trajectory_topic = rospy.Publisher("targets", MarkerArray)
+    bullets_topic = rospy.Publisher("bullets", MarkerArray)
+
     # r_arm_ik = actionlib.SimpleActionClient('right_arm', MoveArmAction)
     # l_arm_ik = actionlib.SimpleActionClient('left_arm', MoveArmAction)
     # r_arm_ik.wait_for_server()
@@ -528,6 +564,29 @@ def testShootAngle():
 
     pylab.show()
 
+## Visualization ##########
+def createMarker(pos, color = (.1, .1, 1), ID = 0, alpha = 1., size = 0.5):
+    marker = Marker()
+    marker.header.frame_id = "/base_footprint"
+    marker.id = ID
+    marker.type = marker.SPHERE
+    marker.action = marker.ADD
+
+    marker.scale.x = size
+    marker.scale.y = size
+    marker.scale.z = size
+    marker.color.a = alpha
+
+    marker.color.r = color[0]
+    marker.color.g = color[1]
+    marker.color.b = color[2]
+    marker.pose.orientation.w = 1.0
+
+    marker.pose.position.x = pos[0]
+    marker.pose.position.y = pos[1]
+    marker.pose.position.z = pos[2]
+    return marker
+
 if __name__ == '__main__':
     ## Create a node
     rospy.init_node('arm_movement', anonymous=True)
@@ -539,7 +598,7 @@ if __name__ == '__main__':
     #moveHandTo((0,0,0), r0 * PyKDL.Rotation.RPY(0,-0.4,0))
     #print getHandPos('r')[1].GetRPY()
     shootTarget([], True)
-    
+     
     #r_controller.send_goal(createFKGoal([[ 0.3,.4,0,-2,pi,-pi/2,0] ], 'r'))
     #l_controller.send_goal(createFKGoal([[ 0.3,.4,0,-2,pi,-pi/2,0] ], 'l'))
     #apply_wrench_server.wait_for_server()
