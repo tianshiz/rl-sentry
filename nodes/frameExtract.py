@@ -3,11 +3,12 @@
 
 Extracts requested information from a given frame
 """
-import roslib; roslib.load_manifest('ros-sentry')
+import roslib; roslib.load_manifest('ros_sentry')
 import rospy
 import tf
 import sys
 import PyKDL
+from PyKDL import *
 
 # array of joints to iterate over
 JOINTS = ["head", "neck", "torso", "left_shoulder", "left_elbow", "right_shoulder", "right_elbow", "left_hip", "left_knee", "right_hip", "right_knee", "left_hand", "right_hand", "left_foot", "right_foot"]
@@ -16,7 +17,7 @@ JOINTS = ["head", "neck", "torso", "left_shoulder", "left_elbow", "right_shoulde
 joint_n = (11,4)
 torso_j = 2
 
-def grabFrame(listener):
+def grabFrame(listener, time = None):
   """ 
   Return a frame of joint positions and orientations
 
@@ -32,28 +33,27 @@ def grabFrame(listener):
   P(i)   => position of ith joint
   x,y,z """
 
-  now = rospy.Time(0)
+  if time is None:
+      time = rospy.Time(0)
 
-  frame = [[PyKDL.Rotation(1,0,0,0,1,0,0,0,1),
-                   PyKDL.Vector(0,0,0)]]*15
-
+  #frame = [[Rotation(1,0,0,0,1,0,0,0,1), Vector(0,0,0)]]*15
+  frame = []
   i = 1
 
   for j in JOINTS:
-    (position,quaternion) = listener.lookupTransform("/openni_depth_frame", "/"+j+"_1", now)
+    (position,quaternion) = listener.lookupTransform("/openni_depth_frame", "/"+j+"_1", time)
     x,y,z = position
     Qx,Qy,Qz,Qw = quaternion
     f = Frame(Rotation.Quaternion(Qx,Qy,Qz,Qw),Vector(x,y,z)) 
 
     if i<12:
-      frame[i]=[PyKDL.Rotation(f.M[0,0], f.M[0,1], f.M[0,2], f.M[1,0], f.M[1,1], f.M[1,2], f.M[2,0], f.M[2,1], f.M[2,2]), PyKDL.Vector(x,y,z)]
+      frame.append([Rotation(f.M[0,0], f.M[0,1], f.M[0,2], f.M[1,0], f.M[1,1], f.M[1,2], f.M[2,0], f.M[2,1], f.M[2,2]), Vector(x,y,z)])
     else:
-      frame[i]=[PyKDL.Rotation(1,0,0,0,1,0,0,0,1), PyKDL.Vector(x,y,z)]
+      frame.append([Rotation(1,0,0,0,1,0,0,0,1), Vector(x,y,z)])
 
     i += 1
 
   return frame
-
 def whiten(frame):
   """ Translate the frame to local axis and orientate
   """
@@ -70,6 +70,14 @@ def extractRelPosition(frame):
   Uses Torso (could be more complex)
   """
   return frame[torso_j]
+
+def extractXYPosition(frame):
+  """ Extract the relative position of the frame
+    
+  Uses Torso (could be more complex)
+  """
+  return frame[torso_j][1][0], frame[torso_j][1][1]
+
 
 def extractPoseFeatures(frame):
   """ Extract the pose features 

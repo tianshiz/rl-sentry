@@ -17,7 +17,7 @@ from PyKDL import *
 # array of states robot can be in
 STATES = ["Neutral", "Friendly", "Hostile", "HOSTILE"]
 
-def classify_frame(frame,m):
+def classify_frame(frame, m):
   """Classify an individual frame as either friendly or hostile
   output confidence values 
  
@@ -34,13 +34,13 @@ def classify_frame(frame,m):
   vect = frameExtract.extractPoseFeatures(frame)
   me=numpy.mean(vect)
   se=numpy.std(vect)
-  vect[:]=[(p-float(me)/float(se)) for p in vect]
+  vect = [(p-float(me)/float(se)) for p in vect]
 #  xp.extend([vect])
-  p_label, p_acc, p_val = svm_predict([0]*len(vect), vect, m, '-q')
+  p_label, p_acc, p_val = svm_predict([0], [vect], m, '-q')
 
   return p_val[0][0]
 
-def getClass(frames,m,state,pval,s_pval):
+def getClass(frame,m,state,pval,s_pval):
   # PR2 Sentry States
   NEUTRAL  = 1
   FRIENDLY = 0
@@ -49,7 +49,7 @@ def getClass(frames,m,state,pval,s_pval):
 
 
 
-  print 'Current State: ', STATES[state], 'pval = ', s_pval
+ # print 'Current State: ', STATES[state], 'pval = ', s_pval
 
   # constantly shift in confidence values, use their sums to determine state transitions
   pval[:-1] = pval[1:]
@@ -78,6 +78,6 @@ def getClass(frames,m,state,pval,s_pval):
       state = WHOSTILE 
       pval = [0]*10
 
-  return state
+  return state, pval, s_pval
 
 

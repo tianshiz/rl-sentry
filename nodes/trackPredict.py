@@ -41,10 +41,11 @@ def KalmanStep(x,p, z_past= [], step_future = 0):
   """
   I = eye(4)
 
-  A = KalmanStep.A
-  Q = KalmanStep.Q
-  H = KalmanStep.H
-  R = KalmanStep.R
+  A = numpy.array([[1,0 ,.1, 0],[0, 1 ,0 ,.1],[0, 0 ,1 ,0],[0, 0 ,0 ,1]])
+
+  Q = eye(4) * 0.01
+  H = eye(4)
+  R = diag((0.1,0.1,.9,.9))
 
   x_old=x[:,numpy.newaxis]
   p_old=p

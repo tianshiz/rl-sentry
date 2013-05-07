@@ -3,7 +3,7 @@
 
 sentrybot
 """
-import roslib; roslib.load_manifest('ros-sentry')
+import roslib; roslib.load_manifest('ros_sentry')
 import rospy
 from std_msgs.msg import String
 import actionlib
@@ -12,7 +12,40 @@ import tf
 import sys
 import poseClassify
 import frameExtract
+import trackPredict
+import numpy
 sys.path.insert(0,'../libsvm-3.17/python')
+from svmutil import *
+
+## RViz
+from geometry_msgs.msg import Point
+from visualization_msgs.msg import Marker, MarkerArray
+
+def createMarkerLine(pos_list, color = (.1, .1, 1), ID = 0, alpha = 1., size = 0.5):
+    marker = Marker()
+    marker.header.frame_id = "/openni_depth_frame"
+    marker.id = ID
+    marker.type = marker.LINE_STRIP
+    marker.action = marker.ADD
+
+    marker.scale.x = size
+    marker.scale.y = size
+    marker.scale.z = size
+    marker.color.a = alpha
+
+    marker.color.r = color[0]
+    marker.color.g = color[1]
+    marker.color.b = color[2]
+    marker.pose.orientation.w = 1.0
+
+    marker.pose.position.x = 0
+    marker.pose.position.y = 0
+    marker.pose.position.z = 0
+
+    for p in pos_list:
+        marker.points.append( Point(p[0],p[1],0) )
+
+    return marker
 
 #state machine method that makes high level decisions
 def stateMachine(state):
@@ -39,7 +72,7 @@ def stateMachine(state):
         else:
             #friendly, go to wave to id
             state=WAVE
-            waveHand()
+            #waveHand()
 
     elif state==WAVE:
         #when the robot beckons you to id yourself. stand still and face the robot
@@ -48,7 +81,7 @@ def stateMachine(state):
         #nothing happens as long as u remain friendly or neutral
 
     elif state==SHOOT:
-        if fof==0:m
+        if fof==0:
             #friendly
             state=STANDBY
         elif fof==1:
@@ -67,6 +100,7 @@ def stateMachine(state):
             state=STANDBY
         else:
             #shoot(trajectory,0)
+            pass
 
         #otherwise we remain aiming if neutral
     else:
@@ -83,11 +117,18 @@ def init():
   # load classification model
   m = svm_load_model('heart_scale.model')
 
+
+
 if __name__ == '__main__':
     global fof 
     # initialize tf_listener
     rospy.init_node('tf_listener')
     listener = tf.TransformListener()
+
+    trajectory_topic = rospy.Publisher("trajectory_target", Marker)
+
+
+    rospy.sleep(1)
     #load svm model
     m = svm_load_model('heart_scale.model')
     START=0
@@ -98,20 +139,24 @@ if __name__ == '__main__':
     AIM=5
 
     state=START #initial state
-    targetTrajectory=[]
-    trajectoryHistory=[]
-    start=0
+    targetTraj=[]
+    trajHistory=numpy.zeros((10,4))
+    start=1
 
 
 
       # Initial state is neutral  
-    posestate = NEUTRAL  
+    posestate = 1 
     pval = [0]*10
     s_pval = 0
+    sampling_time = .1
+    past = rospy.Time.now() + rospy.Duration(sampling_time)
+    init = True
 
     try:
-        listener.waitForTransform("/torso_1", "/openni_depth_frame", rospy.Time(), rospy.Duration(4.0))
+        listener.waitForTransform("/torso_1", "/openni_depth_frame", past, rospy.Duration(4.0))
         print 'Detected user, begin classifying'
+        past = rospy.Time.now()
     except (tf.Exception):
         print 'Unable to detect user'  
     #forever loop
@@ -123,27 +168,59 @@ if __name__ == '__main__':
         #run likenormal
             
             ## Mainloop
-            
-            #grab a frame periodically
-            listener.waitForTransform("/torso_1", "/openni_depth_frame", now, rospy.Duration(4.0))
+            now = rospy.Time.now()
+            print (now-past).to_sec()
+            while (now-past).to_sec() > sampling_time:
+                
+                #grab a frame periodically
+                listener.waitForTransform("/torso_1", "/openni_depth_frame", past, rospy.Duration(4.0))
 
-            #call this getFrames function, made from parts of tf-listener
-            frame=frameExtract.grabFrame(listener) 
-            #update current pose state
-            posestate=poseClassify.getClass(frame,m,posestate,pval,s_pval)
+                #call this getFrames function, made from parts of tf-listener
+                frame=frameExtract.grabFrame(listener, time = past) 
+                past = past + rospy.Duration(sampling_time)
+                #print time, past, dt
+                #past = time
+                x,y = frameExtract.extractXYPosition(frame)
+                
 
-            #there are two returns for hostile, we count them the same
-            if posestate==3 or posestate==2:
-                fof=2
-            else:
-                #update global fof variable for statemachine
-                fof=posestate
+                trajHistory[:-1,:] = trajHistory[1:,:]
+                if init:
+                    trajHistory[-1,0] = x
+                    trajHistory[-1,1] = y            
+                    trajHistory[-1,2] = 0
+                    trajHistory[-1,3] = 0
+                    init = False
+                else:
+                    trajHistory[-1,0] = x
+                    trajHistory[-1,1] = y            
+                    trajHistory[-1,2] = (x-trajHistory[-2,0])/sampling_time
+                    trajHistory[-1,3] = (y-trajHistory[-2,1])/sampling_time
 
+                ## Visualize trajectory
+                marker = createMarkerLine( pos_list = trajHistory, color = (1., 0.1, 0.),
+                                  ID = i, size = 0.02 )
+                trajectory_topic.publish(marker)
+
+                #update current pose state
+                posestate, pval, s_pval=poseClassify.getClass(frame,m,posestate,pval,s_pval)
+
+                #there are two returns for hostile, we count them the same
+                if posestate==3 or posestate==2:
+                    fof=2
+                else:
+                    #update global fof variable for statemachine
+                    fof=posestate
 
             #with frames, get predicted trajectory, a string of points in trajector
-            #trajectory=predictPath(frames)
+            targetTraj = trackPredict.predict(trajHistory,10)
+            print 'Current State'
+            print trajHistory
+            print 'Predcition'
+            print targetTraj
 
             #publish trajectory to rostopics
 
             #get next state
             state=stateMachine(state)
+
+            rospy.sleep(.05)
