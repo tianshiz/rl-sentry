@@ -3,7 +3,7 @@
 
 sentrybot
 """
-import roslib; roslib.load_manifest('ros-sentry')
+import roslib; roslib.load_manifest('rl-sentry')
 import rospy
 from std_msgs.msg import String
 import actionlib
