@@ -20,8 +20,6 @@ STATES = ["Neutral", "Friendly", "Hostile", "HOSTILE"]
 
 global user
 
-user = 1
-
 #-------------------------------------------------------------
 # grab an individual frame of joint information
 #-------------------------------------------------------------
@@ -104,6 +102,8 @@ def classify_frame(listener,m):
 # MAIN METHOD
 if __name__ == '__main__':
   global user
+  
+  user = 1
   # initialize tf_listener
   rospy.init_node('tf_listener')
   listener = tf.TransformListener()
@@ -121,11 +121,16 @@ if __name__ == '__main__':
   state = NEUTRAL  
   pval = [0]*10
   s_pval = 0
-  try:
-    listener.waitForTransform("/torso_1", "/openni_depth_frame", rospy.Time(), rospy.Duration(4.0))
-    print 'Detected user, begin classifying'
-  except (tf.Exception):
-    print 'Unable to detect user'  
+  detected = False
+  while not detected:
+    try:
+      listener.waitForTransform("/torso_"+str(user), "/openni_depth_frame", rospy.Time(), rospy.Duration(4.0))
+      detected = True
+      print 'Detected user, begin classifying'
+    except (tf.Exception):
+      print 'Unable to detect user ' + str(user) + ' searching for user ' + str(user+1)
+      user = (user%10)+1
+      continue 
   while not rospy.is_shutdown():
     try: 
       print 'Current State: ', STATES[state], 'pval = ', s_pval
@@ -158,8 +163,9 @@ if __name__ == '__main__':
         if s_pval > 9:
           state = WHOSTILE 
           pval = [0]*10
-    except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-      user = user + 1
+    except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException, tf.Exception):
+      user = (user%10)+1
+
       print 'Lost user, now searching for user ' + str(user)
       continue
     
