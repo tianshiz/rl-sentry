@@ -1,0 +1,16 @@
+<launch>
+  <!-- Launch gazebo -->
+  <include file="/opt/ros/fuerte/stacks/pr2_simulator/pr2_gazebo/launch/pr2_empty_world.launch" />
+  <!-- Launch openni_launch -->
+  <include file="/opt/ros/fuerte/stacks/openni_launch/launch/openni.launch" />
+  <!-- Run openni_tracker -->
+  <node pkg="openni_tracker" type="openni_tracker" name="tracker" />
+  <!-- Run rviz -->
+  <node pkg="rviz" type="rviz" name="rviz" />
+  <!-- Run image_view -->
+  <node pkg="image_view" type="disparity_view" name="viewer" output="screen" >
+    <remap from="image" to="/camera/depth/disparity"/> 
+  </node>
+  <node pkg="tf" type="static_transform_publisher" name="camera_robot_link" args="0 0 1 0 0 0 /base_footprint /camera_link 100">
+  </node>
+</launch>
