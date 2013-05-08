@@ -92,7 +92,7 @@ def moveGrip(p = 0.08, arm_side = 'r'):
     """
     open = Pr2GripperCommandGoal()
     open.command.position = p
-    open.command.max_effort = -1.0
+    open.command.max_effort = -2.0
     r_g_controller.send_goal(open)
 
 def gunpose(theta = 0, phi = 0):
@@ -215,7 +215,7 @@ def initGunAngle():
         
 ## Sharpshooter
 def getGunPos():
-    ## TODO!!!!!!!!!!!
+    ## TODO For the Real Robot, implement frame transformation
     p, r = getHandPos()
     return p, hand2gun*r
 
@@ -265,6 +265,8 @@ def bulletTrajectory(x0, v0, dt, a = -9.8*r_[0,0,1]):
 
 def practiceShootGazebo(target):
     """ Simulate Shooting
+
+    PROBABLY NOT WORKING ANYMORE
 
     target is a Point / tuple
     
@@ -331,56 +333,30 @@ def practiceShootGazebo(target):
             t_min = t
             dist_min = dist
 
-    savetxt('trajectory.txt', [t[1] for t in trajectory ])
+    #savetxt('trajectory.txt', [t[1] for t in trajectory ])
     t = array([t[1] for t in trajectory ]).T
     pylab.plot(t[0], t[1])
     pylab.show()
     return t_min, dist_min  # Return hit (or minimal distance)
 
-def practiceShootTheory(target):
-    """ Predict trajectory of bullet using physics filter 
+def aimTarget(target_pos):
+    """ Aim at the target direction """
+    dx = array(target_pos) - array(gun_pos)
     
-    target is a position
-    """
-    
-    x, r0 = getHandPos(arm_side)
-    v = r0.Inverse() * gun2hand * bulletPhysics()   # Generate initial speed
-    a = (0, 0, -9.8)
-    dt = 0.1
-    
-    dist_min = 9999
-    t_min = 0
-    
-    for i in xrange(300):
-        x, v = x + v * dt, v + a * dt
-        if sqrt(sum(x-target)**2) < dist_min:
-            t_min = i*dt
-            
-    return t_min, dist_min
-    
-def createTrainingSet(n = 100):
-    trainSet = []
-    for i in xrange(n):
-        ## Decide target position
-        target = random.random(3)
-        ## Decide hand position
-        x0 = random.random(3)
-        moveHandTo(x)
-        hit = practiceShootGazebo(target)
-        ## Save trial
-    return trainSet
+    ## TODO Repetition of code
+    gun_pos, gun_rot = getGunPos()
+    phi, theta, dt = inverseAngle(dx, bullet_v0)
+    aim = PyKDL.Rotation.RPY(0,  -theta, pi/2-phi)
 
-def aimSharpshooter(target):
-    ## Return joints / handposition / posegoal to hit the target
-    pass
+    moveHandTo( (0,0,0), aim)
 
 ### Encoded Actions
 ## Encode wave
-wave = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
+wave = [[0.7, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0], 
         [0.1, 0.3,  0.0, -1.8,  0.0,  0.0,   0.3],
         [0.1, 0.2, 0.0, -0.8, 0.0, 0.0, 0.0],
         [0.1, 0.3,  0.0, -1.8,  0.0,  0.0,   0.3],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
+        [0.7, 0.5, 0.0, -1.8, 0.0, 0.0, 0.0]]
 
 
 def robotWave():
@@ -395,16 +371,14 @@ def robotShoot():
     r_g_controller.wait_for_result()
     moveGrip(0)
 
-
-    
     
 def shootTarget(target_trajectory, debug_plot = False):
     """ Target contains the trajectory.. """
     ## Get next few points in target trajectory
     if debug_plot:
-        target_trajectory = [(2, (3,-2,1)),
+        target_trajectory = [(2, (3,-2,0.3)),
                              (3, (4,0,1)),
-                             (4, (5,2,1))]  ## Placeholder
+                             (4, (5,2,2))]  ## Placeholder
 
     ## for each of trajectory points calculate angle
     coarse_aims = [0]*len(target_trajectory)
@@ -416,13 +390,42 @@ def shootTarget(target_trajectory, debug_plot = False):
         coarse_aims[i] = (PyKDL.Rotation.RPY(0,  -theta, pi/2-phi), dt)
     
     ## sample proj traj for each angle at the given time
-    samples_n = 10
     samples_p = []
+    
     for i, (r0, dt) in enumerate(coarse_aims):
         v0 = bulletPhysics(samples_n, r0)
         samples_p.append( bulletTrajectory(gun_pos, v0, dt))
         
-        #ax.scatter(samples_p[0],samples_p[1],samples_p[2], 'b')
+    aim_p = zeros(len(target_trajectory))  # Probability of hitting the target anytime for the given trajectory
+    for j, (target_t, target_pos) in enumerate(target_trajectory):
+        # vectorize target position for faster numpy calculation
+        # TODO both inner and outer loops could be vectorized
+        target_array = zeros( (samples_n,3))
+        target_array[:,0] = target_pos[0]
+        target_array[:,1] = target_pos[1]
+        target_array[:,2] = target_pos[2]
+
+        # calculate how close to other trajectory points you get
+        for i, (r0, dt) in enumerate(coarse_aims):
+            v0 = bulletPhysics(samples_n, r0)
+            shoot_t = target_t -(target_trajectory[i][0] - dt)
+            if shoot_t < 0:
+                continue
+            distance2 = sqrt(sum((target_array - bulletTrajectory(gun_pos, v0, shoot_t))**2, axis=1))
+            
+            p_hit = (radius_target / distance2) # Probability to hit euristic
+            p_hit[p_hit > 1] = 1 # Cutoff for hits on target
+            
+            aim_p[i] += sum(p_hit) ## Normalization not needed, always same amount of samples
+
+    ## Best trajectory!!
+    best_aim = argmax(aim_p)
+
+    for i,p in enumerate(aim_p):
+        print "P %d= %f"%(i,p),
+        if best_aim == i:
+            print '  <===',
+        print
     
     ## Publish target trajectory
     ## Possibly on mastermind
@@ -461,16 +464,14 @@ def shootTarget(target_trajectory, debug_plot = False):
     # Publish trajectory
     bullet_trajectory_topic.publish(markerArray)
 
-    
-    #sample some man traj at that time
-    #count how many close points we get
-    #forward kinematics    
-    moveHandTo( (0,0,0), coarse_aims[1][0])    
-    #goal = aimSharpshooter(target)
-    ## schedule arm movement and trigger
-    ## shoot
+    ## forward kinematics    
+    moveHandTo( (0,0,0), coarse_aims[2][0])    
 
+    ## MAYBE schedule arm movement and trigger
     
+    ## Shoot !!!!
+    robotShoot()
+
     
 def test():
     ## Get List of Arms Joints
@@ -508,6 +509,8 @@ bullet_m = 0.0013  # From URDF file
 bullet_v0 = 17.8 ## ms
 bullet_d_angle = 0.017 ## rad
 
+samples_n = 10
+radius_target = .5
 
 def initROScom():
     """ Init all server connections """
