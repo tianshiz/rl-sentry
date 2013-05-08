@@ -107,19 +107,29 @@ def init():
     KalmanStep.R = diag((0.1,0.1,.9,.9)) 
 
 def testAnimation(fname):
+  dt = .1
+  frames = fof.loadPose(fname)
   trajectory = zeros((10,4))
   z_past=[]
   # Run it
-  with open(fname,'r') as f:
-    read_data=f.readlines()
-    for line in read_data:
-      line=line[:-1] #remove /n char
-      line=line.split(',') #convert toist
-      z_past.extend([[float(line[0]) ,float(line[1]) ,float(line[2]), float(line[3])]])
+#  with open(fname,'r') as f:
+#    read_data=f.readlines()
+#    for line in read_data:
+#      line=line[:-1] #remove /n char
+#      line=line.split(',') #convert toist
+#      z_past.extend([[float(line[0]) ,float(line[1]) ,float(line[2]), float(line[3])]])
   
+  for f in xrange(len(frames)):
+    t_p = fof.extractRelPosition(frames[f])[1]
+    if f==0:
+      z_past.extend([[t_p[0],t_p[1],0,0]])
+    else:
+      t_p_ = fof.extractRelPosition(frames[f-1])[1]
+      z_past.extend([[t_p[0],t_p[1],(t_p[0]-t_p_[0])/dt,(t_p[1]-t_p_[1])/dt]])
+
   # First set up the figure, the axis, and the plot element we want to animate
   fig = plt.figure()
-  ax = plt.axes(xlim=(-4, 4), ylim=(-3, 3))
+  ax = plt.axes(xlim=(0, 4), ylim=(-2, 2))
   line, = ax.plot(trajectory[0], trajectory[1], lw=2)
   line2, = ax.plot(trajectory[0], trajectory[1],'r',lw=2)
 
@@ -150,6 +160,8 @@ def testAnimation(fname):
 
   # call the animator.  blit=True means only re-draw the parts that have changed.
   anim = animation.FuncAnimation(fig, animate, init_func=init, interval=100, blit=True)
+
+#  anim.save('track_path.mp4', fps=10)
 
   plt.show()
 
@@ -192,6 +204,8 @@ def test3D(fname):
   # Creating the Animation object
   anim = animation.FuncAnimation(fig, animate, init_func=init, interval=100, blit=True)
   
+#  anim.save('track_skeleton.mp4', fps=10)
+#  plt.axis('off')
   plt.show()
 
 def getXY():
@@ -322,8 +336,8 @@ def trackSkeleton():
 if __name__ == '__main__':
   # Init node
   init()
-#  testAnimation('approach1_path.txt')    
-  test3D('../data/approach1.txt')
+  testAnimation('../data/lookaround2.txt')    
+#  test3D('../data/creep1.txt')
 #  rospy.init_node('tf_listener')
 #  listener = tf.TransformListener()
 #  rate = rospy.Rate(10.0)

@@ -15,7 +15,6 @@
   <depend package="arm_navigation_msgs"/>
   <depend package="pr2_controllers_msgs"/>
   <depend package="kdl"/>
-  <depend package="arm_navigation_msgs"/>
   <depend package="geometric_shapes"/>
   <depend package="visualization_msgs"/>
   <depend package="python_orocos_kdl"/>

@@ -5,6 +5,7 @@ sentrybot
 """
 
 import roslib; roslib.load_manifest('ros_sentry')
+
 import rospy
 from std_msgs.msg import String
 import actionlib
