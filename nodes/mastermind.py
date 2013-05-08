@@ -3,6 +3,7 @@
 
 sentrybot
 """
+
 import roslib; roslib.load_manifest('ros_sentry')
 import rospy
 from std_msgs.msg import String
@@ -50,6 +51,7 @@ def createMarkerLine(pos_list, color = (.1, .1, 1), ID = 0, alpha = 1., size = 0
 #state machine method that makes high level decisions
 def stateMachine(state):
     global fof #state flags
+
     #state definitions
     START=0
     END=1
@@ -62,6 +64,7 @@ def stateMachine(state):
         #brief startup state to init some flags, we never come back here
         state=STANDBY #go to standby
         fof=1 #fof can be 0 for friendly, 1 for neutral, 2 for foe
+
     elif state==END:
         pass
     elif state==STANDBY:
@@ -78,6 +81,7 @@ def stateMachine(state):
         #when the robot beckons you to id yourself. stand still and face the robot
         if fof==2:
             state=AIM
+
         #nothing happens as long as u remain friendly or neutral
 
     elif state==SHOOT:
@@ -91,6 +95,7 @@ def stateMachine(state):
            # shoot(trajectory,1) #publish trajector and shoot command(1) to arm_node
             state=AIM #go back to aiming
     elif state==AIM:
+
         #keep aiming at the person
         if fof==2:
             #shoot if foe!
@@ -98,13 +103,16 @@ def stateMachine(state):
         elif fof==0:
             #go on standby knowing the person is friendly
             state=STANDBY
+
         else:
             #shoot(trajectory,0)
             pass
 
+
         #otherwise we remain aiming if neutral
     else:
         raise ValueError, "unexpected state "+state
+
 
     return state
 
@@ -145,6 +153,7 @@ if __name__ == '__main__':
 
     init()
 
+
     START=0
     END=1
     STANDBY=2
@@ -153,6 +162,7 @@ if __name__ == '__main__':
     AIM=5
 
     state=START #initial state
+
     targetTraj=[]
     trajHistory=numpy.zeros((10,4))
     start=1
@@ -177,10 +187,12 @@ if __name__ == '__main__':
             user = (user%10)+1
             continue 
 
+
     #forever loop
     while True:
         if start==0:
         #mastermind should not run
+
             state=END
         else:
         #run likenormal
@@ -256,3 +268,4 @@ if __name__ == '__main__':
             state=stateMachine(state)
 
 #            rospy.sleep(.05)
+
