@@ -17,7 +17,7 @@ JOINTS = ["head", "neck", "torso", "left_shoulder", "left_elbow", "right_shoulde
 joint_n = (11,4)
 torso_j = 2
 
-def grabFrame(listener, time = None):
+def grabFrame(listener, user, time = None):
   """ 
   Return a frame of joint positions and orientations
 
@@ -41,7 +41,7 @@ def grabFrame(listener, time = None):
   i = 1
 
   for j in JOINTS:
-    (position,quaternion) = listener.lookupTransform("/openni_depth_frame", "/"+j+"_1", time)
+    (position,quaternion) = listener.lookupTransform("/openni_depth_frame", "/"+j+"_"+str(user), time)
     x,y,z = position
     Qx,Qy,Qz,Qw = quaternion
     f = Frame(Rotation.Quaternion(Qx,Qy,Qz,Qw),Vector(x,y,z)) 
